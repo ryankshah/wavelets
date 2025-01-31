@@ -3,11 +3,15 @@ defmodule Wavelets.Analysis do
   Tools for analyzing and visualizing wavelet transforms
   """
 
+  @type coefficient_list :: list(number) | list(list(number))
+  @type energy_result :: %{level: integer, subband: atom, energy: float} | float
+
   @doc """
-  Computes energy distribution across wavelet coefficients
+  Computes energy distribution across wavelet coefficients.
+  For 1D signals returns a float value representing total energy.
+  For 2D signals returns a map with level, subband, and energy information.
   """
-  @spec energy_distribution(list(number) | list(list(number))) ::
-          %{level: integer, subband: atom, energy: float}
+  @spec energy_distribution(coefficient_list()) :: energy_result()
   def energy_distribution(coeffs) when is_list(coeffs) do
     cond do
       is_number(hd(coeffs)) ->
