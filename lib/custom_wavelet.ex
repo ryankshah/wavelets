@@ -28,8 +28,9 @@ defmodule Wavelets.CustomWavelet do
              recon_low,
              recon_high
            ),
-         :ok <- verify_orthogonality(decomp_low, decomp_high),
-         vanishing_moments = compute_vanishing_moments(decomp_high) do
+         :ok <- verify_orthogonality(decomp_low, decomp_high) do
+      vanishing_moments = compute_vanishing_moments(decomp_high)
+
       filter = %Filter{
         name: Keyword.get(opts, :name, "custom"),
         family: :custom,

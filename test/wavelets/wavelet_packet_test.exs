@@ -3,7 +3,8 @@ defmodule Wavelets.WaveletPacketTest do
   doctest Wavelets.WaveletPacket
 
   import Wavelets.TestHelpers
-  alias Wavelets.{WaveletPacket, Filters}
+  alias Wavelets.Filters
+  alias Wavelets.WaveletPacket
 
   describe "decompose_1d/4" do
     test "creates correct tree structure" do

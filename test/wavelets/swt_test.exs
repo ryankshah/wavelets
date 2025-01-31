@@ -3,7 +3,8 @@ defmodule Wavelets.SWTTest do
   doctest Wavelets.SWT
 
   import Wavelets.TestHelpers
-  alias Wavelets.{SWT, Filters}
+  alias Wavelets.Filters
+  alias Wavelets.SWT
 
   describe "transform_1d/4" do
     test "computes correct number of levels" do

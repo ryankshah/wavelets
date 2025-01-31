@@ -31,28 +31,35 @@ defmodule Wavelets.CWT do
 
     0..(signal_length - 1)
     |> Enum.map(fn b ->
-      # Compute wavelet coefficients at each time point
-      # wavelet support range
+      compute_coefficient(signal, wavelet_fn, scale, dt, b, signal_length)
+    end)
+  end
+
+  defp compute_coefficient(signal, wavelet_fn, scale, dt, b, signal_length) do
+    # wavelet support range
+    coefficient =
       -10..10
       |> Enum.map(fn k ->
-        t = k * dt
-        pos = b + k
-
-        if pos >= 0 and pos < signal_length do
-          {re, im} = wavelet_fn.(t / scale)
-          signal_val = Enum.at(signal, pos)
-          {signal_val * re, signal_val * im}
-        else
-          {0.0, 0.0}
-        end
+        compute_point(signal, wavelet_fn, scale, dt, b, k, signal_length)
       end)
       |> Enum.reduce({0.0, 0.0}, fn {re1, im1}, {re2, im2} ->
         Complex.add({re1, im1}, {re2, im2})
       end)
-      |> then(fn {re, im} ->
-        factor = :math.sqrt(dt / scale)
-        Complex.scale({re, im}, factor)
-      end)
-    end)
+
+    factor = :math.sqrt(dt / scale)
+    Complex.scale(coefficient, factor)
+  end
+
+  defp compute_point(signal, wavelet_fn, scale, dt, b, k, signal_length) do
+    t = k * dt
+    pos = b + k
+
+    if pos >= 0 and pos < signal_length do
+      {re, im} = wavelet_fn.(t / scale)
+      signal_val = Enum.at(signal, pos)
+      {signal_val * re, signal_val * im}
+    else
+      {0.0, 0.0}
+    end
   end
 end

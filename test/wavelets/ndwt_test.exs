@@ -3,7 +3,8 @@ defmodule Wavelets.NDWTTest do
   doctest Wavelets.NDWT
 
   import Wavelets.TestHelpers
-  alias Wavelets.{NDWT, Filters}
+  alias Wavelets.Filters
+  alias Wavelets.NDWT
 
   describe "forward/4" do
     test "handles 1D case correctly" do

@@ -3,7 +3,9 @@ defmodule Wavelets.IDWTTest do
   doctest Wavelets.IDWT
 
   import Wavelets.TestHelpers
-  alias Wavelets.{DWT, IDWT, Filters}
+  alias Wavelets.DWT
+  alias Wavelets.Filters
+  alias Wavelets.IDWT
 
   describe "inverse_1d/4" do
     test "perfectly reconstructs signal with Haar wavelet" do
