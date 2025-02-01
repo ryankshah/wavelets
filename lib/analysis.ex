@@ -8,17 +8,42 @@ defmodule Wavelets.Analysis do
   Computes energy distribution across wavelet coefficients
   """
   @spec energy_distribution(list(number) | list(list(number))) ::
-          %{level: integer, subband: atom, energy: float} | float
+          float | map()
   def energy_distribution(coeffs) when is_list(coeffs) do
     cond do
       is_number(hd(coeffs)) ->
-        # 1D case - compute total energy
-        compute_energy_1d(coeffs)
+        # 1D case - total signal energy
+        compute_total_energy(coeffs)
 
       is_list(hd(coeffs)) ->
-        # 2D case - compute energy per subband
-        compute_energy_2d(coeffs)
+        # 2D or higher case
+        compute_subband_energies(coeffs)
     end
+  end
+
+  defp compute_total_energy(signal) do
+    signal
+    |> Enum.map(&(&1 * &1))
+    |> Enum.sum()
+  end
+
+  defp compute_subband_energies(coeffs) do
+    # For 2D case, compute energies per subband
+    approx_energy = compute_total_energy(List.flatten(coeffs))
+
+    detail_energies =
+      coeffs
+      |> List.flatten()
+      |> Enum.chunk_every(div(length(List.flatten(coeffs)), 4))
+      |> Enum.map(&compute_total_energy/1)
+
+    %{
+      approximation: Enum.at(detail_energies, 0, 0.0),
+      horizontal: Enum.at(detail_energies, 1, 0.0),
+      vertical: Enum.at(detail_energies, 2, 0.0),
+      diagonal: Enum.at(detail_energies, 3, 0.0),
+      total: approx_energy
+    }
   end
 
   @doc """

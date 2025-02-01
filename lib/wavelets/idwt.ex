@@ -11,24 +11,27 @@ defmodule Wavelets.IDWT do
   @spec inverse_1d(list(number), list(number), Filter.t(), Wavelets.precision()) ::
           list(number)
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
-    # Normalize filter coefficients for energy preservation
-    norm = :math.sqrt(2)
-    normalized_lo = Enum.map(filter.reconstruction_low_pass, &(&1 * norm))
-    normalized_hi = Enum.map(filter.reconstruction_high_pass, &(&1 * norm))
+    # Scale for energy preservation
+    scale = :math.sqrt(2)
+    scaled_approx = Enum.map(approximation, &(&1 * scale))
+    scaled_details = Enum.map(details, &(&1 * scale))
 
     # Upsample and apply reconstruction filters
-    upsampled_approx = upsample_convolve(approximation, normalized_lo)
-    upsampled_details = upsample_convolve(details, normalized_hi)
+    upsampled_approx =
+      upsample_convolve(scaled_approx, filter.reconstruction_low_pass)
 
-    # Combine and trim to original length
-    result_length = 2 * length(approximation)
+    upsampled_details =
+      upsample_convolve(scaled_details, filter.reconstruction_high_pass)
 
-    combined =
-      Enum.zip(upsampled_approx, upsampled_details)
-      |> Enum.map(fn {a, d} -> a + d end)
+    # Ensure proper length
+    signal_length = 2 * length(approximation)
+    filter_delay = div(filter.support_width - 1, 2)
 
-    # Trim to exact length
-    Enum.take(combined, result_length)
+    # Combine and trim
+    Enum.zip(upsampled_approx, upsampled_details)
+    |> Enum.map(fn {a, d} -> a + d end)
+    |> Enum.drop(filter_delay)
+    |> Enum.take(signal_length)
   end
 
   @doc """
@@ -59,7 +62,7 @@ defmodule Wavelets.IDWT do
       |> Enum.map(fn {h, d} -> inverse_1d(h, d, filter, precision) end)
       |> transpose()
 
-    # Inverse transform on rows and trim to original size
+    # Inverse transform on rows and ensure proper size
     target_size = 2 * length(approximation)
 
     Enum.zip(rows_low, rows_high)
@@ -69,11 +72,11 @@ defmodule Wavelets.IDWT do
 
   # Helper functions
   defp upsample_convolve(signal, filter) do
-    # Upsample signal
+    # Upsample
     upsampled = Enum.flat_map(signal, &[&1, 0.0])
-
-    # Pad for convolution
     filter_length = length(filter)
+
+    # Add padding
     padding = List.duplicate(0.0, filter_length)
     padded = padding ++ upsampled ++ padding
 

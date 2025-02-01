@@ -12,32 +12,35 @@ defmodule Wavelets.DWT do
           {list(number), list(number)}
   def forward_1d(signal, filter, _precision \\ :double) do
     n = length(signal)
-    half_n = div(n, 2)
+    half_n = div(n + filter.support_width - 1, 2)
 
-    # Extend signal for proper boundary handling
+    # Extend signal symmetrically
     extended = extend_signal(signal, filter.support_width)
-
-    # Normalize filter coefficients for energy preservation
-    norm = :math.sqrt(2)
-    normalized_lo = Enum.map(filter.decomposition_low_pass, &(&1 / norm))
-    normalized_hi = Enum.map(filter.decomposition_high_pass, &(&1 / norm))
 
     # Apply decomposition filters and downsample
     approximation =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, normalized_lo, j, filter.support_width)
+        sum = convolve_at(extended, filter.decomposition_low_pass, j)
+        # Normalize for energy preservation
+        sum / :math.sqrt(2)
       end)
 
     details =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, normalized_hi, j, filter.support_width)
+        sum = convolve_at(extended, filter.decomposition_high_pass, j)
+        # Normalize for energy preservation
+        sum / :math.sqrt(2)
       end)
 
-    {approximation, details}
+    # Trim to correct size
+    {
+      Enum.take(approximation, div(n, 2)),
+      Enum.take(details, div(n, 2))
+    }
   end
 
   @doc """
@@ -71,25 +74,27 @@ defmodule Wavelets.DWT do
 
   # Helper functions
   defp extend_signal(signal, filter_length) do
-    half_length = div(filter_length, 2)
-
-    # Symmetric extension
-    left_pad = signal |> Enum.take(half_length) |> Enum.reverse()
-    right_pad = signal |> Enum.reverse() |> Enum.take(half_length)
-
-    left_pad ++ signal ++ right_pad
+    padding_size = filter_length - 1
+    padding_left = signal |> Enum.take(padding_size) |> Enum.reverse()
+    padding_right = signal |> Enum.reverse() |> Enum.take(padding_size)
+    padding_left ++ signal ++ padding_right
   end
 
-  defp convolve_at(signal, filter, position, filter_length) do
-    half_length = div(filter_length, 2)
-    start_pos = max(0, position - half_length)
-    end_pos = min(length(signal) - 1, position + half_length)
+  defp convolve_at(signal, filter, position) do
+    filter_length = length(filter)
+    start_pos = position
+    end_pos = min(length(signal) - 1, position + filter_length - 1)
 
-    signal_slice = Enum.slice(signal, start_pos..end_pos)
-    filter_slice = Enum.take(filter, length(signal_slice))
+    0..(filter_length - 1)
+    |> Enum.map(fn i ->
+      pos = start_pos + i
 
-    Enum.zip(signal_slice, filter_slice)
-    |> Enum.map(fn {s, f} -> s * f end)
+      if pos <= end_pos do
+        Enum.at(signal, pos) * Enum.at(filter, i)
+      else
+        0.0
+      end
+    end)
     |> Enum.sum()
   end
 

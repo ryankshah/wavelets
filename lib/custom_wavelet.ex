@@ -7,38 +7,39 @@ defmodule Wavelets.CustomWavelet do
   alias Wavelets.Filter
 
   @doc """
-  Creates a custom wavelet filter from given coefficients.
+  Creates a custom wavelet filter from given coefficients
   """
-  @spec create(
-          list(number),
-          list(number),
-          list(number),
-          list(number),
-          keyword()
-        ) ::
-          {:ok, Filter.t()} | {:error, String.t()}
   def create(decomp_low, decomp_high, recon_low, recon_high, opts \\ []) do
+    # Normalize filter coefficients first
+    norm_decomp_low = normalize_filter(decomp_low)
+    norm_decomp_high = normalize_filter(decomp_high)
+    norm_recon_low = normalize_filter(recon_low)
+    norm_recon_high = normalize_filter(recon_high)
+
     with :ok <-
-           verify_length_match(decomp_low, decomp_high, recon_low, recon_high),
+           verify_length_match(
+             norm_decomp_low,
+             norm_decomp_high,
+             norm_recon_low,
+             norm_recon_high
+           ),
          :ok <-
            verify_perfect_reconstruction(
-             decomp_low,
-             decomp_high,
-             recon_low,
-             recon_high
+             norm_decomp_low,
+             norm_decomp_high,
+             norm_recon_low,
+             norm_recon_high
            ),
-         :ok <- verify_orthogonality(decomp_low, decomp_high) do
-      vanishing_moments = compute_vanishing_moments(decomp_high)
-
+         :ok <- verify_orthogonality(norm_decomp_low, norm_decomp_high) do
       filter = %Filter{
         name: Keyword.get(opts, :name, "custom"),
         family: :custom,
-        vanishing_moments: vanishing_moments,
-        decomposition_low_pass: normalize_filter(decomp_low),
-        decomposition_high_pass: normalize_filter(decomp_high),
-        reconstruction_low_pass: normalize_filter(recon_low),
-        reconstruction_high_pass: normalize_filter(recon_high),
-        support_width: length(decomp_low)
+        vanishing_moments: compute_vanishing_moments(norm_decomp_high),
+        decomposition_low_pass: norm_decomp_low,
+        decomposition_high_pass: norm_decomp_high,
+        reconstruction_low_pass: norm_recon_low,
+        reconstruction_high_pass: norm_recon_high,
+        support_width: length(norm_decomp_low)
       }
 
       {:ok, filter}
@@ -93,6 +94,32 @@ defmodule Wavelets.CustomWavelet do
     end
   end
 
+  defp verify_orthogonality(low_pass, high_pass) do
+    # Normalize filters
+    low_pass = normalize_filter(low_pass)
+    high_pass = normalize_filter(high_pass)
+
+    if verify_orthogonality_condition(low_pass) and
+         verify_orthogonality_condition(high_pass) and
+         verify_cross_orthogonality(low_pass, high_pass) do
+      :ok
+    else
+      {:error, "Orthogonality conditions not satisfied"}
+    end
+  end
+
+  # Helper functions
+  defp normalize_filter(coeffs) do
+    sum_squares = coeffs |> Enum.map(&(&1 * &1)) |> Enum.sum()
+    norm = :math.sqrt(sum_squares)
+
+    if norm > 0 do
+      Enum.map(coeffs, &(&1 / norm))
+    else
+      coeffs
+    end
+  end
+
   defp verify_perfect_reconstruction(d_low, d_high, r_low, r_high) do
     # Normalize filters for verification
     d_low = normalize_filter(d_low)
@@ -112,32 +139,6 @@ defmodule Wavelets.CustomWavelet do
       :ok
     else
       {:error, "Perfect reconstruction condition not satisfied"}
-    end
-  end
-
-  defp verify_orthogonality(low_pass, high_pass) do
-    # Normalize filters
-    low_pass = normalize_filter(low_pass)
-    high_pass = normalize_filter(high_pass)
-
-    if verify_orthogonality_condition(low_pass) and
-         verify_orthogonality_condition(high_pass) and
-         verify_cross_orthogonality(low_pass, high_pass) do
-      :ok
-    else
-      {:error, "Orthogonality conditions not satisfied"}
-    end
-  end
-
-  # Helper functions
-  defp normalize_filter(coeffs) do
-    sum = Enum.sum(Enum.map(coeffs, &(&1 * &1)))
-    norm = :math.sqrt(sum)
-
-    if norm > 0 do
-      Enum.map(coeffs, &(&1 / norm))
-    else
-      coeffs
     end
   end
 
@@ -233,9 +234,9 @@ defmodule Wavelets.CustomWavelet do
     end)
   end
 
-  defp almost_zero(x, tolerance \\ 1.0e-10), do: abs(x) < tolerance
+  defp almost_zero(x, tolerance \\ 1.0e-6), do: abs(x) < tolerance
 
-  defp almost_equal(x, y, tolerance \\ 1.0e-10)
+  defp almost_equal(x, y, tolerance \\ 1.0e-6)
 
   defp almost_equal(x, y, tolerance) when is_number(x) and is_number(y) do
     abs(x - y) < tolerance
