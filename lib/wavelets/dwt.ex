@@ -11,25 +11,40 @@ defmodule Wavelets.DWT do
   @spec forward_1d(list(number), Filter.t(), Wavelets.precision()) ::
           {list(number), list(number)}
   def forward_1d(signal, filter, _precision \\ :double) do
-    # Extend signal with symmetric padding
-    extended = extend_signal(signal, filter)
-
     n = length(signal)
     half_n = div(n, 2)
 
-    # Apply decomposition filters and downsample
+    # For perfect reconstruction and correct scaling
+    scale = :math.sqrt(2)
+
+    # Compute approximation coefficients
     approximation =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, filter.decomposition_low_pass, j)
+        # Take a 2-point window and apply low-pass filter
+        window = Enum.slice(signal, j..(j + 1))
+
+        Enum.zip(window, filter.decomposition_low_pass)
+        |> Enum.map(fn {s, f} -> s * f end)
+        |> Enum.sum()
+        # Scale for energy preservation
+        |> Kernel.*(scale)
       end)
 
+    # Compute detail coefficients
     details =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, filter.decomposition_high_pass, j)
+        # Take a 2-point window and apply high-pass filter
+        window = Enum.slice(signal, j..(j + 1))
+
+        Enum.zip(window, filter.decomposition_high_pass)
+        |> Enum.map(fn {s, f} -> s * f end)
+        |> Enum.sum()
+        # Scale for energy preservation
+        |> Kernel.*(scale)
       end)
 
     {approximation, details}
@@ -64,36 +79,7 @@ defmodule Wavelets.DWT do
     {approximation, {horizontal_details, vertical_details, diagonal_details}}
   end
 
-  # Helper functions
-  defp extend_signal(signal, filter) do
-    padding_size = div(filter.support_width - 1, 2)
-    left_padding = signal |> Enum.take(padding_size) |> Enum.reverse()
-    right_padding = signal |> Enum.reverse() |> Enum.take(padding_size)
-    left_padding ++ signal ++ right_padding
-  end
-
-  defp convolve_at(signal, filter_coeffs, position) do
-    filter_length = length(filter_coeffs)
-    half_length = div(filter_length, 2)
-
-    # Center the filter at position
-    start = max(0, position - half_length)
-    ending = min(length(signal) - 1, position + half_length)
-
-    # Extract signal segment and compute convolution
-    0..(filter_length - 1)
-    |> Enum.map(fn i ->
-      idx = start + i
-
-      if idx <= ending do
-        Enum.at(signal, idx) * Enum.at(filter_coeffs, i)
-      else
-        0.0
-      end
-    end)
-    |> Enum.sum()
-  end
-
+  # Helper function
   defp transpose(matrix) do
     matrix
     |> Enum.zip()

@@ -11,23 +11,23 @@ defmodule Wavelets.IDWT do
   @spec inverse_1d(list(number), list(number), Filter.t(), Wavelets.precision()) ::
           list(number)
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
-    # Upsample and apply reconstruction filters
-    upsampled_approx =
-      upsample_convolve(approximation, filter.reconstruction_low_pass)
+    scale = :math.sqrt(2)
+    n = length(approximation)
 
-    upsampled_details =
-      upsample_convolve(details, filter.reconstruction_high_pass)
+    # Upsample and reconstruct
+    0..(2 * n - 1)
+    |> Enum.map(fn i ->
+      pos = div(i, 2)
+      # Get coefficients
+      a = Enum.at(approximation, pos, 0.0)
+      d = Enum.at(details, pos, 0.0)
 
-    # Combine coefficients and trim padding
-    signal_length = 2 * length(approximation)
+      # Apply reconstruction filters
+      r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
+      r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-    Enum.zip(upsampled_approx, upsampled_details)
-    |> Enum.map(fn {a, d} -> a + d end)
-    |> then(fn reconstructed ->
-      padding = div(length(filter.reconstruction_low_pass) - 1, 2)
-      middle = div(length(reconstructed), 2)
-      start = middle - div(signal_length, 2)
-      Enum.slice(reconstructed, start..(start + signal_length - 1))
+      # Combine and normalize
+      (a * r_low + d * r_high) / scale
     end)
   end
 
@@ -60,31 +60,8 @@ defmodule Wavelets.IDWT do
       |> transpose()
 
     # Inverse transform on rows
-    target_size = 2 * length(approximation)
-
     Enum.zip(rows_low, rows_high)
     |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
-    |> Enum.map(&Enum.take(&1, target_size))
-  end
-
-  defp upsample_convolve(signal, filter) do
-    # Upsample signal
-    upsampled = Enum.flat_map(signal, &[&1, 0.0])
-
-    # Add padding for convolution
-    padding_size = length(filter)
-
-    padded =
-      List.duplicate(0.0, padding_size) ++
-        upsampled ++ List.duplicate(0.0, padding_size)
-
-    # Apply filter
-    0..(length(padded) - length(filter))
-    |> Enum.map(fn i ->
-      Enum.zip(Enum.slice(padded, i..(i + length(filter) - 1)), filter)
-      |> Enum.map(fn {s, f} -> s * f end)
-      |> Enum.sum()
-    end)
   end
 
   defp transpose(matrix) do
