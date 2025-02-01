@@ -53,4 +53,9 @@ defmodule Wavelets.SWTTest do
       end)
     end
   end
+
+  # Helper function for generating test signals
+  defp generate_test_signal do
+    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+  end
 end
