@@ -11,22 +11,24 @@ defmodule Wavelets.IDWT do
   @spec inverse_1d(list(number), list(number), Filter.t(), Wavelets.precision()) ::
           list(number)
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
+    # Normalize filter coefficients for energy preservation
+    norm = :math.sqrt(2)
+    normalized_lo = Enum.map(filter.reconstruction_low_pass, &(&1 * norm))
+    normalized_hi = Enum.map(filter.reconstruction_high_pass, &(&1 * norm))
+
     # Upsample and apply reconstruction filters
-    upsampled_approx =
-      upsample_convolve(approximation, filter.reconstruction_low_pass)
+    upsampled_approx = upsample_convolve(approximation, normalized_lo)
+    upsampled_details = upsample_convolve(details, normalized_hi)
 
-    upsampled_details =
-      upsample_convolve(details, filter.reconstruction_high_pass)
+    # Combine and trim to original length
+    result_length = 2 * length(approximation)
 
-    # Combine coefficients
-    signal_length = 2 * length(approximation)
-
-    result =
+    combined =
       Enum.zip(upsampled_approx, upsampled_details)
       |> Enum.map(fn {a, d} -> a + d end)
-      |> Enum.take(signal_length)
 
-    result
+    # Trim to exact length
+    Enum.take(combined, result_length)
   end
 
   @doc """
@@ -57,22 +59,25 @@ defmodule Wavelets.IDWT do
       |> Enum.map(fn {h, d} -> inverse_1d(h, d, filter, precision) end)
       |> transpose()
 
-    # Inverse transform on rows
+    # Inverse transform on rows and trim to original size
+    target_size = 2 * length(approximation)
+
     Enum.zip(rows_low, rows_high)
     |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
+    |> Enum.map(&Enum.take(&1, target_size))
   end
 
   # Helper functions
   defp upsample_convolve(signal, filter) do
-    # Upsample
-    upsampled = signal |> Enum.flat_map(&[&1, 0.0])
-    filter_length = length(filter)
+    # Upsample signal
+    upsampled = Enum.flat_map(signal, &[&1, 0.0])
 
-    # Add padding
+    # Pad for convolution
+    filter_length = length(filter)
     padding = List.duplicate(0.0, filter_length)
     padded = padding ++ upsampled ++ padding
 
-    # Convolve
+    # Apply filter
     0..(length(padded) - filter_length)
     |> Enum.map(fn i ->
       Enum.zip(Enum.slice(padded, i..(i + filter_length - 1)), filter)

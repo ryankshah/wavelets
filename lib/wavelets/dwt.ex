@@ -14,31 +14,30 @@ defmodule Wavelets.DWT do
     n = length(signal)
     half_n = div(n, 2)
 
-    # Extend signal symmetrically
+    # Extend signal for proper boundary handling
     extended = extend_signal(signal, filter.support_width)
+
+    # Normalize filter coefficients for energy preservation
+    norm = :math.sqrt(2)
+    normalized_lo = Enum.map(filter.decomposition_low_pass, &(&1 / norm))
+    normalized_hi = Enum.map(filter.decomposition_high_pass, &(&1 / norm))
 
     # Apply decomposition filters and downsample
     approximation =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, filter.decomposition_low_pass, j)
+        convolve_at(extended, normalized_lo, j, filter.support_width)
       end)
 
     details =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        convolve_at(extended, filter.decomposition_high_pass, j)
+        convolve_at(extended, normalized_hi, j, filter.support_width)
       end)
 
-    # Scale for proper energy normalization
-    scale = 1.0
-
-    {
-      Enum.map(approximation, &(&1 * scale)),
-      Enum.map(details, &(&1 * scale))
-    }
+    {approximation, details}
   end
 
   @doc """
@@ -72,29 +71,25 @@ defmodule Wavelets.DWT do
 
   # Helper functions
   defp extend_signal(signal, filter_length) do
-    padding_size = filter_length - 1
-    padding_left = Enum.take(signal, padding_size) |> Enum.reverse()
-    padding_right = Enum.take(Enum.reverse(signal), padding_size)
-    padding_left ++ signal ++ padding_right
+    half_length = div(filter_length, 2)
+
+    # Symmetric extension
+    left_pad = signal |> Enum.take(half_length) |> Enum.reverse()
+    right_pad = signal |> Enum.reverse() |> Enum.take(half_length)
+
+    left_pad ++ signal ++ right_pad
   end
 
-  defp convolve_at(signal, filter, position) do
-    filter_length = length(filter)
-    signal_length = length(signal)
+  defp convolve_at(signal, filter, position, filter_length) do
+    half_length = div(filter_length, 2)
+    start_pos = max(0, position - half_length)
+    end_pos = min(length(signal) - 1, position + half_length)
 
-    start_pos = position
-    end_pos = min(signal_length - 1, position + filter_length - 1)
+    signal_slice = Enum.slice(signal, start_pos..end_pos)
+    filter_slice = Enum.take(filter, length(signal_slice))
 
-    0..(filter_length - 1)
-    |> Enum.map(fn i ->
-      pos = start_pos + i
-
-      if pos <= end_pos do
-        Enum.at(signal, pos) * Enum.at(filter, i)
-      else
-        0.0
-      end
-    end)
+    Enum.zip(signal_slice, filter_slice)
+    |> Enum.map(fn {s, f} -> s * f end)
     |> Enum.sum()
   end
 

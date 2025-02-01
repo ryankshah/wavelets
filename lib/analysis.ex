@@ -1,26 +1,23 @@
+# lib/wavelets/analysis.ex
 defmodule Wavelets.Analysis do
   @moduledoc """
   Tools for analyzing and visualizing wavelet transforms
   """
 
-  @type coefficient_list :: list(number) | list(list(number))
-  @type energy_result :: %{level: integer, subband: atom, energy: float} | float
-
   @doc """
-  Computes energy distribution across wavelet coefficients.
-  For 1D signals returns a float value representing total energy.
-  For 2D signals returns a map with level, subband, and energy information.
+  Computes energy distribution across wavelet coefficients
   """
-  @spec energy_distribution(coefficient_list()) :: energy_result()
+  @spec energy_distribution(list(number) | list(list(number))) ::
+          %{level: integer, subband: atom, energy: float} | float
   def energy_distribution(coeffs) when is_list(coeffs) do
     cond do
       is_number(hd(coeffs)) ->
-        # 1D case
-        compute_1d_energy(coeffs)
+        # 1D case - compute total energy
+        compute_energy_1d(coeffs)
 
       is_list(hd(coeffs)) ->
-        # 2D or higher case
-        compute_2d_energy(coeffs)
+        # 2D case - compute energy per subband
+        compute_energy_2d(coeffs)
     end
   end
 
@@ -56,38 +53,75 @@ defmodule Wavelets.Analysis do
     }
   end
 
-  @doc """
-  Generates visualization data for plotting
-  """
-  @spec visualization_data(list(number) | list(list(number))) :: map()
-  def visualization_data(coeffs) when is_list(coeffs) do
-    cond do
-      is_number(hd(coeffs)) ->
-        # 1D visualization data
-        generate_1d_viz_data(coeffs)
-
-      is_list(hd(coeffs)) ->
-        # 2D visualization data
-        generate_2d_viz_data(coeffs)
-    end
-  end
-
-  # Helper functions
-  defp compute_1d_energy(coeffs) do
+  # Private helper functions
+  defp compute_energy_1d(coeffs) do
     coeffs
     |> Enum.map(&(&1 * &1))
     |> Enum.sum()
   end
 
-  defp compute_2d_energy(coeffs) do
+  defp compute_energy_2d(coeffs) do
+    total_energy = compute_energy_1d(List.flatten(coeffs))
+    level_count = trunc(:math.log2(length(coeffs)))
+
+    subbands =
+      for level <- 1..level_count do
+        size = trunc(:math.pow(2, level_count - level))
+
+        {
+          approximation_energy(coeffs, size),
+          horizontal_energy(coeffs, size),
+          vertical_energy(coeffs, size),
+          diagonal_energy(coeffs, size)
+        }
+      end
+
+    %{
+      total_energy: total_energy,
+      subbands: subbands
+    }
+  end
+
+  defp approximation_energy(coeffs, size) do
     coeffs
-    |> Enum.map(&compute_1d_energy/1)
-    |> Enum.sum()
+    |> Enum.take(size)
+    |> Enum.map(&Enum.take(&1, size))
+    |> List.flatten()
+    |> compute_energy_1d()
+  end
+
+  defp horizontal_energy(coeffs, size) do
+    coeffs
+    |> Enum.take(size)
+    |> Enum.map(&Enum.slice(&1, size..-1))
+    |> List.flatten()
+    |> compute_energy_1d()
+  end
+
+  defp vertical_energy(coeffs, size) do
+    coeffs
+    |> Enum.slice(size..-1)
+    |> Enum.map(&Enum.take(&1, size))
+    |> List.flatten()
+    |> compute_energy_1d()
+  end
+
+  defp diagonal_energy(coeffs, size) do
+    coeffs
+    |> Enum.slice(size..-1)
+    |> Enum.map(&Enum.slice(&1, size..-1))
+    |> List.flatten()
+    |> compute_energy_1d()
   end
 
   defp normalize(values) do
     sum = Enum.sum(Enum.map(values, &abs/1))
-    Enum.map(values, &(abs(&1) / sum))
+
+    if sum > 0 do
+      Enum.map(values, &(abs(&1) / sum))
+    else
+      values
+    end
   end
 
   defp mean(values) do
@@ -107,9 +141,13 @@ defmodule Wavelets.Analysis do
     v = variance(values)
     std = :math.sqrt(v)
 
-    values
-    |> Enum.map(&:math.pow((&1 - m) / std, 3))
-    |> mean()
+    if std > 0 do
+      values
+      |> Enum.map(&:math.pow((&1 - m) / std, 3))
+      |> mean()
+    else
+      0.0
+    end
   end
 
   defp kurtosis(values) do
@@ -117,35 +155,96 @@ defmodule Wavelets.Analysis do
     v = variance(values)
     std = :math.sqrt(v)
 
-    values
-    |> Enum.map(&:math.pow((&1 - m) / std, 4))
-    |> mean()
-    # Excess kurtosis
-    |> Kernel.-(3)
+    if std > 0 do
+      values
+      |> Enum.map(&:math.pow((&1 - m) / std, 4))
+      |> mean()
+      # Excess kurtosis
+      |> Kernel.-(3)
+    else
+      0.0
+    end
   end
 
   defp sparsity(values) do
-    threshold = 0.001 * Enum.max_by(values, &abs/1)
+    max_amp = Enum.max_by(values, &abs/1)
+    threshold = 0.001 * max_amp
     count_small = Enum.count(values, &(abs(&1) < threshold))
     count_small / length(values)
+  end
+
+  @doc """
+  Generates visualization data for plotting
+  """
+  @spec visualization_data(list(number) | list(list(number))) :: map()
+  def visualization_data(coeffs) when is_list(coeffs) do
+    cond do
+      is_number(hd(coeffs)) ->
+        # 1D visualization data
+        generate_1d_viz_data(coeffs)
+
+      is_list(hd(coeffs)) ->
+        # 2D visualization data
+        generate_2d_viz_data(coeffs)
+    end
   end
 
   defp generate_1d_viz_data(coeffs) do
     %{
       values: coeffs,
       x_range: 0..(length(coeffs) - 1) |> Enum.to_list(),
-      type: "1d"
+      type: "1d",
+      energy: compute_energy_1d(coeffs)
     }
   end
 
   defp generate_2d_viz_data(coeffs) do
-    height = length(coeffs)
-    width = length(hd(coeffs))
-
     %{
       values: coeffs,
-      dimensions: {width, height},
-      type: "2d"
+      dimensions: {length(hd(coeffs)), length(coeffs)},
+      type: "2d",
+      energy: compute_energy_2d(coeffs)
     }
+  end
+
+  @doc """
+  Computes relative energy distribution across levels
+  """
+  @spec level_energy_distribution(list(number) | list(list(number))) ::
+          list({integer, float})
+  def level_energy_distribution(coeffs) when is_list(coeffs) do
+    total_energy = compute_energy_1d(List.flatten(coeffs))
+
+    if total_energy > 0 do
+      coeffs_by_level = split_by_level(coeffs)
+
+      coeffs_by_level
+      |> Enum.with_index()
+      |> Enum.map(fn {level_coeffs, level} ->
+        energy = compute_energy_1d(List.flatten(level_coeffs))
+        {level, energy / total_energy}
+      end)
+    else
+      []
+    end
+  end
+
+  defp split_by_level(coeffs) when is_list(coeffs) do
+    cond do
+      is_number(hd(coeffs)) ->
+        # Base case: single level
+        [coeffs]
+
+      is_list(hd(coeffs)) ->
+        # Split into approximation and details
+        n = length(coeffs)
+        half_n = div(n, 2)
+
+        approx = Enum.take(coeffs, half_n)
+        details = Enum.drop(coeffs, half_n)
+
+        # Recursively split approximation
+        split_by_level(approx) ++ [details]
+    end
   end
 end
