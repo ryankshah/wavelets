@@ -3,7 +3,8 @@ defmodule Wavelets.NDWTTest do
   doctest Wavelets.NDWT
 
   import Wavelets.TestHelpers
-  alias Wavelets.{NDWT, Filters}
+  alias Wavelets.Filters
+  alias Wavelets.NDWT
 
   test "perfectly reconstructs 3D signal" do
     signal = for _ <- 1..4, do: generate_test_signal_2d()
