@@ -11,10 +11,8 @@ defmodule Wavelets.IDWT do
   @spec inverse_1d(list(number), list(number), Filter.t(), Wavelets.precision()) ::
           list(number)
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
-    scale = :math.sqrt(2)
     n = length(approximation)
 
-    # Upsample and reconstruct
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
@@ -22,12 +20,12 @@ defmodule Wavelets.IDWT do
       a = Enum.at(approximation, pos, 0.0)
       d = Enum.at(details, pos, 0.0)
 
-      # Apply reconstruction filters
+      # Get filter coefficients
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      # Combine and normalize
-      (a * r_low + d * r_high) / scale
+      # Combine and scale
+      (a * r_low + d * r_high) / 2
     end)
   end
 
@@ -65,8 +63,6 @@ defmodule Wavelets.IDWT do
   end
 
   defp transpose(matrix) do
-    matrix
-    |> Enum.zip()
-    |> Enum.map(&Tuple.to_list/1)
+    matrix |> Enum.zip() |> Enum.map(&Tuple.to_list/1)
   end
 end

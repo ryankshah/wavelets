@@ -8,27 +8,28 @@ defmodule Wavelets.NDWT do
   @doc """
   Performs n-dimensional forward discrete wavelet transform
   """
-  @spec forward(
-          list() | list(list()) | list(list(list())),
-          Filter.t(),
-          pos_integer(),
-          Wavelets.precision()
-        ) ::
+  @spec forward(list(), Filter.t(), pos_integer(), Wavelets.precision()) ::
           {list(), list()}
-  def forward(signal, filter, dims, _precision \\ :double) do
+  def forward(signal, filter, dims, precision \\ :double) when dims > 0 do
     case dims do
       1 when is_list(signal) ->
-        DWT.forward_1d(signal, filter)
+        DWT.forward_1d(signal, filter, precision)
 
       2 when is_list(hd(signal)) ->
-        DWT.forward_2d(signal, filter)
-
-      n when n > 2 ->
-        do_forward_nd(signal, filter, dims)
+        DWT.forward_2d(signal, filter, precision)
 
       _ ->
-        raise ArgumentError, "Invalid signal dimensions or structure"
+        forward_nd(signal, filter, dims, precision)
     end
+  end
+
+  defp forward_nd(signal, filter, dims, precision) do
+    # Transform along first dimension
+    {approx_lists, detail_lists} =
+      Enum.map(signal, &forward(&1, filter, dims - 1, precision))
+      |> Enum.unzip()
+
+    {approx_lists, detail_lists}
   end
 
   @doc """
@@ -36,43 +37,22 @@ defmodule Wavelets.NDWT do
   """
   @spec inverse(list(), list(), Filter.t(), pos_integer(), Wavelets.precision()) ::
           list()
-  def inverse(approximation, details, filter, dims, _precision \\ :double) do
+  def inverse(approximation, details, filter, dims, precision \\ :double)
+      when dims > 0 do
     case dims do
       1 ->
-        IDWT.inverse_1d(approximation, details, filter)
+        IDWT.inverse_1d(approximation, details, filter, precision)
 
       2 ->
-        IDWT.inverse_2d(approximation, details, filter)
-
-      n when n > 2 ->
-        do_inverse_nd(approximation, details, filter, dims)
+        IDWT.inverse_2d(approximation, details, filter, precision)
 
       _ ->
-        raise ArgumentError, "Invalid dimensions"
+        inverse_nd(approximation, details, filter, dims, precision)
     end
   end
 
-  # Helper functions
-  defp do_forward_nd(signal, filter, dims) when dims > 2 do
-    # Apply transform along first dimension
-    {approx_temp, details_temp} =
-      Enum.map(signal, fn slice ->
-        if is_list(slice) do
-          forward(slice, filter, dims - 1)
-        else
-          raise ArgumentError,
-                "Invalid signal structure for n-dimensional transform"
-        end
-      end)
-      |> Enum.unzip()
-
-    {approx_temp, details_temp}
-  end
-
-  defp do_inverse_nd(approximation, details, filter, dims) when dims > 2 do
+  defp inverse_nd(approximation, details, filter, dims, precision) do
     Enum.zip(approximation, details)
-    |> Enum.map(fn {approx_slice, detail_slice} ->
-      inverse(approx_slice, detail_slice, filter, dims - 1)
-    end)
+    |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
   end
 end

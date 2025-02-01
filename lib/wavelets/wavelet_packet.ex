@@ -1,11 +1,9 @@
 defmodule Wavelets.WaveletPacket do
   @moduledoc """
-  Implementation of Wavelet Packet decomposition and reconstruction.
+  Implementation of Wavelet Packet decomposition and reconstruction
   """
 
-  alias Wavelets.DWT
-  alias Wavelets.Filter
-  alias Wavelets.IDWT
+  alias Wavelets.{DWT, Filter, IDWT}
 
   @doc """
   Performs 1D wavelet packet decomposition
@@ -18,29 +16,37 @@ defmodule Wavelets.WaveletPacket do
         ) ::
           map()
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    initial_tree = %{{0, 0} => signal}
-    do_decompose(initial_tree, filter, 0, levels)
+    tree = %{{0, 0} => signal}
+    decompose_level(tree, filter, levels)
   end
 
-  defp do_decompose(tree, _filter, current_level, max_levels)
-       when current_level >= max_levels do
-    tree
-  end
+  defp decompose_level(tree, _filter, 0), do: tree
 
-  defp do_decompose(tree, filter, current_level, max_levels) do
+  defp decompose_level(tree, filter, level) do
+    current_level = level - 1
+    nodes = get_level_nodes(tree, current_level)
+
     new_nodes =
-      for j <- 0..(:math.pow(2, current_level) |> trunc |> Kernel.-(1)),
-          signal when is_list(signal) <- [Map.get(tree, {current_level, j})],
-          {approx, details} = DWT.forward_1d(signal, filter) do
-        %{
-          {current_level + 1, 2 * j} => approx,
-          {current_level + 1, 2 * j + 1} => details
-        }
-      end
-      |> Enum.reduce(%{}, &Map.merge(&2, &1))
+      nodes
+      |> Enum.flat_map(fn {node_idx, signal} ->
+        {approx, details} = DWT.forward_1d(signal, filter)
 
-    tree = Map.merge(tree, new_nodes)
-    do_decompose(tree, filter, current_level + 1, max_levels)
+        [
+          {{level, node_idx * 2}, approx},
+          {{level, node_idx * 2 + 1}, details}
+        ]
+      end)
+      |> Map.new()
+
+    tree
+    |> Map.merge(new_nodes)
+    |> decompose_level(filter, level - 1)
+  end
+
+  defp get_level_nodes(tree, level) do
+    tree
+    |> Map.filter(fn {{node_level, _}, _} -> node_level == level end)
+    |> Map.filter(fn {_, signal} -> is_list(signal) end)
   end
 
   @doc """
@@ -57,24 +63,24 @@ defmodule Wavelets.WaveletPacket do
     reconstruct_level(tree, filter, max_level)
   end
 
-  defp reconstruct_level(tree, _filter, 0), do: Map.get(tree, {0, 0})
+  defp reconstruct_level(tree, _filter, 0) do
+    Map.get(tree, {0, 0})
+  end
 
   defp reconstruct_level(tree, filter, level) do
-    new_nodes =
-      0..(:math.pow(2, level - 1) |> trunc |> Kernel.-(1))
-      |> Enum.map(fn j ->
-        approx = Map.get(tree, {level, 2 * j})
-        details = Map.get(tree, {level, 2 * j + 1})
+    max_nodes = trunc(:math.pow(2, level - 1))
 
-        if approx && details do
-          node = IDWT.inverse_1d(approx, details, filter)
-          {{level - 1, j}, node}
-        end
-      end)
-      |> Enum.reject(&is_nil/1)
+    new_nodes =
+      for j <- 0..(max_nodes - 1),
+          approx = Map.get(tree, {level, j * 2}),
+          details = Map.get(tree, {level, j * 2 + 1}),
+          approx != nil and details != nil do
+        {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
+      end
       |> Map.new()
 
-    tree = Map.merge(tree, new_nodes)
-    reconstruct_level(tree, filter, level - 1)
+    tree
+    |> Map.merge(new_nodes)
+    |> reconstruct_level(filter, level - 1)
   end
 end
