@@ -6,100 +6,73 @@ defmodule Wavelets.NDWT do
   alias Wavelets.{DWT, Filter, IDWT}
 
   @doc """
-  Performs n-dimensional forward discrete wavelet transform.
-  The input signal should be a nested list structure matching the dimensions.
-  Returns a tuple with approximation and a list of detail coefficients.
+  Performs n-dimensional forward discrete wavelet transform
   """
-  @spec forward(list(), Filter.t(), non_neg_integer(), Wavelets.precision()) ::
+  @spec forward(
+          list() | list(list()) | list(list(list())),
+          Filter.t(),
+          pos_integer(),
+          Wavelets.precision()
+        ) ::
           {list(), list()}
   def forward(signal, filter, dims, _precision \\ :double) do
     case dims do
-      1 -> DWT.forward_1d(signal, filter)
-      2 -> DWT.forward_2d(signal, filter)
-      _ -> do_forward_nd(signal, filter, dims)
+      1 when is_list(signal) ->
+        DWT.forward_1d(signal, filter)
+
+      2 when is_list(hd(signal)) ->
+        DWT.forward_2d(signal, filter)
+
+      n when n > 2 ->
+        do_forward_nd(signal, filter, dims)
+
+      _ ->
+        raise ArgumentError, "Invalid signal dimensions or structure"
     end
   end
 
   @doc """
   Performs n-dimensional inverse discrete wavelet transform
   """
-  @spec inverse(
-          list(),
-          list(),
-          Filter.t(),
-          non_neg_integer(),
-          Wavelets.precision()
-        ) :: list()
+  @spec inverse(list(), list(), Filter.t(), pos_integer(), Wavelets.precision()) ::
+          list()
   def inverse(approximation, details, filter, dims, _precision \\ :double) do
     case dims do
-      1 -> IDWT.inverse_1d(approximation, details, filter)
-      2 -> IDWT.inverse_2d(approximation, details, filter)
-      _ -> do_inverse_nd(approximation, details, filter, dims)
+      1 ->
+        IDWT.inverse_1d(approximation, details, filter)
+
+      2 ->
+        IDWT.inverse_2d(approximation, details, filter)
+
+      n when n > 2 ->
+        do_inverse_nd(approximation, details, filter, dims)
+
+      _ ->
+        raise ArgumentError, "Invalid dimensions"
     end
   end
 
-  # Private helper functions
-  defp do_forward_nd(signal, filter, dims) do
-    coeffs = apply_forward_transforms(signal, filter, dims)
-    extract_coeffs(coeffs, dims)
-  end
-
-  defp apply_forward_transforms(signal, filter, dims) do
-    Enum.reduce((dims - 1)..0, signal, fn dim, acc ->
-      transform_dimension(acc, dim, filter)
-    end)
-  end
-
-  defp transform_dimension(signal_nd, 0, filter) do
-    # Base case: apply 1D transform to the innermost lists
-    Enum.map(signal_nd, &DWT.forward_1d(&1, filter))
-  end
-
-  defp transform_dimension(signal_nd, dim, filter) do
-    # Recursive case: traverse to inner dimensions
-    Enum.map(signal_nd, &transform_dimension(&1, dim - 1, filter))
-  end
-
-  defp do_inverse_nd(approximation, details, filter, dims) do
-    coeffs = merge_coeffs(approximation, details, dims)
-    apply_inverse_transforms(coeffs, filter, dims)
-  end
-
-  defp apply_inverse_transforms(coeffs, filter, dims) do
-    Enum.reduce(0..(dims - 1), coeffs, fn dim, acc ->
-      inverse_dimension(acc, dim, filter)
-    end)
-  end
-
-  defp inverse_dimension(signal_nd, 0, filter) do
-    # Base case: apply 1D inverse transform
-    Enum.map(signal_nd, fn {a, d} -> IDWT.inverse_1d(a, d, filter) end)
-  end
-
-  defp inverse_dimension(signal_nd, dim, filter) do
-    # Recursive case: traverse to inner dimensions
-    Enum.map(signal_nd, &inverse_dimension(&1, dim - 1, filter))
-  end
-
-  defp extract_coeffs(coeffs, 1), do: Enum.unzip(coeffs)
-
-  defp extract_coeffs(coeffs, dims) do
-    {approx, details} =
-      coeffs
-      |> Enum.map(&extract_coeffs(&1, dims - 1))
+  # Helper functions
+  defp do_forward_nd(signal, filter, dims) when dims > 2 do
+    # Apply transform along first dimension
+    {approx_temp, details_temp} =
+      Enum.map(signal, fn slice ->
+        if is_list(slice) do
+          forward(slice, filter, dims - 1)
+        else
+          raise ArgumentError,
+                "Invalid signal structure for n-dimensional transform"
+        end
+      end)
       |> Enum.unzip()
 
-    {approx, List.flatten(details)}
+    {approx_temp, details_temp}
   end
 
-  defp merge_coeffs(approximation, details, 1) do
+  defp do_inverse_nd(approximation, details, filter, dims) when dims > 2 do
     Enum.zip(approximation, details)
-  end
-
-  defp merge_coeffs(approximation, details, dims) do
-    detail_chunks = Enum.chunk_every(details, div(length(details), dims))
-
-    Enum.zip(approximation, detail_chunks)
-    |> Enum.map(fn {a, d} -> merge_coeffs(a, d, dims - 1) end)
+    |> Enum.map(fn {approx_slice, detail_slice} ->
+      inverse(approx_slice, detail_slice, filter, dims - 1)
+    end)
   end
 end
