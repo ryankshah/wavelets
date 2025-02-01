@@ -11,22 +11,28 @@ defmodule Wavelets.IDWT do
   @spec inverse_1d(list(number), list(number), Filter.t(), Wavelets.precision()) ::
           list(number)
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
-    # Scale coefficients back
-    scale = :math.sqrt(2)
-    scaled_approx = Enum.map(approximation, &(&1 * scale))
-    scaled_details = Enum.map(details, &(&1 * scale))
+    # Calculate final length
+    n = length(approximation)
+    final_length = 2 * n
 
     # Upsample and apply reconstruction filters
     upsampled_approx =
-      upsample_convolve(scaled_approx, filter.reconstruction_low_pass)
+      upsample_convolve(approximation, filter.reconstruction_low_pass)
 
     upsampled_details =
-      upsample_convolve(scaled_details, filter.reconstruction_high_pass)
+      upsample_convolve(details, filter.reconstruction_high_pass)
 
-    # Combine and trim padding
-    Enum.zip(upsampled_approx, upsampled_details)
-    |> Enum.map(fn {a, d} -> a + d end)
-    |> trim_signal(filter.support_width)
+    # Add a scale factor for energy preservation
+    scale = :math.sqrt(2)
+
+    # Combine and trim padding to exact length
+    combined =
+      Enum.zip(upsampled_approx, upsampled_details)
+      |> Enum.map(fn {a, d} -> (a + d) / scale end)
+
+    # Compute padding size based on filter length
+    padding_size = div(length(combined) - final_length, 2)
+    Enum.slice(combined, padding_size..(padding_size + final_length - 1))
   end
 
   @doc """
@@ -44,6 +50,10 @@ defmodule Wavelets.IDWT do
         filter,
         precision \\ :double
       ) do
+    # Get target dimensions
+    n = length(approximation)
+    target_size = 2 * n
+
     # Inverse transform on columns
     rows_low =
       transpose(approximation)
@@ -58,8 +68,12 @@ defmodule Wavelets.IDWT do
       |> transpose()
 
     # Inverse transform on rows
-    Enum.zip(rows_low, rows_high)
-    |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
+    result =
+      Enum.zip(rows_low, rows_high)
+      |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
+
+    # Ensure result has correct dimensions
+    result |> Enum.map(&Enum.take(&1, target_size))
   end
 
   # Helper functions
@@ -67,29 +81,18 @@ defmodule Wavelets.IDWT do
     # Upsample
     upsampled = signal |> Enum.flat_map(&[&1, 0.0])
 
-    # Add padding for convolution
-    padding_size = length(filter) - 1
-
-    padded =
-      List.duplicate(0.0, padding_size) ++
-        upsampled ++ List.duplicate(0.0, padding_size)
+    # Add padding
+    filter_len = length(filter)
+    padding = List.duplicate(0.0, filter_len)
+    padded = padding ++ upsampled ++ padding
 
     # Convolve
-    0..(length(upsampled) + length(filter) - 2)
+    0..(length(padded) - filter_len)
     |> Enum.map(fn i ->
-      Enum.zip(
-        Enum.slice(padded, i..(i + length(filter) - 1)),
-        filter
-      )
+      Enum.zip(Enum.slice(padded, i..(i + filter_len - 1)), filter)
       |> Enum.map(fn {s, f} -> s * f end)
       |> Enum.sum()
     end)
-  end
-
-  defp trim_signal(signal, filter_length) do
-    padding = div(filter_length - 1, 2)
-    len = length(signal)
-    Enum.slice(signal, padding..(len - padding - 1))
   end
 
   defp transpose(matrix) do
