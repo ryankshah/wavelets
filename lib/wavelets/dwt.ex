@@ -11,27 +11,40 @@ defmodule Wavelets.DWT do
   @spec forward_1d(list(number), Filter.t(), Wavelets.precision()) ::
           {list(number), list(number)}
   def forward_1d(signal, filter, _precision \\ :double) do
+    n = length(signal)
+    half_n = div(n, 2)
+
     # Extend signal with symmetric padding
-    extended_signal = extend_signal(signal, filter.support_width)
+    extended = extend_signal(signal)
 
-    # Apply decomposition filters and downsample
+    # Calculate approximation coefficients
     approximation =
-      convolve_downsample(extended_signal, filter.decomposition_low_pass)
+      0..(half_n - 1)
+      |> Enum.map(fn i ->
+        j = 2 * i
+        convolve_at(extended, filter.decomposition_low_pass, j)
+      end)
 
+    # Calculate detail coefficients
     details =
-      convolve_downsample(extended_signal, filter.decomposition_high_pass)
+      0..(half_n - 1)
+      |> Enum.map(fn i ->
+        j = 2 * i
+        convolve_at(extended, filter.decomposition_high_pass, j)
+      end)
 
-    # Scale coefficients to preserve energy
-    scale = :math.sqrt(2)
+    # Scale for energy preservation
+    scale = 1 / :math.sqrt(2)
 
     {
-      Enum.map(approximation, &(&1 / scale)),
-      Enum.map(details, &(&1 / scale))
+      Enum.map(approximation, &(&1 * scale)),
+      Enum.map(details, &(&1 * scale))
     }
   end
 
   @doc """
-  Performs 2D forward discrete wavelet transform
+  Performs 2D forward discrete wavelet transform.
+  Returns tuple of {approximation, {horizontal_details, vertical_details, diagonal_details}}
   """
   @spec forward_2d(list(list(number)), Filter.t(), Wavelets.precision()) ::
           {list(list(number)),
@@ -60,27 +73,35 @@ defmodule Wavelets.DWT do
   end
 
   # Helper functions
-  defp extend_signal(signal, filter_length) do
-    padding_size = filter_length - 1
-    padding_left = signal |> Enum.take(padding_size) |> Enum.reverse()
-    padding_right = signal |> Enum.reverse() |> Enum.take(padding_size)
-
-    padding_left ++ signal ++ padding_right
+  defp extend_signal(signal) do
+    # Symmetric extension
+    signal ++ Enum.reverse(signal)
   end
 
-  defp convolve_downsample(signal, filter) do
-    signal_length = length(signal)
+  defp convolve_at(signal, filter, position) do
     filter_length = length(filter)
-    output_length = div(signal_length - filter_length + 2, 2)
+    half_length = div(filter_length, 2)
 
-    0..(output_length - 1)
-    |> Enum.map(fn i ->
-      j = i * 2
+    # Center the filter at position
+    start_pos = max(0, position - half_length)
+    end_pos = min(length(signal) - 1, position + half_length)
 
-      Enum.zip(Enum.slice(signal, j..(j + filter_length - 1)), filter)
-      |> Enum.map(fn {s, f} -> s * f end)
-      |> Enum.sum()
-    end)
+    signal_slice = Enum.slice(signal, start_pos..end_pos)
+    filter_slice = Enum.slice(filter, 0..(filter_length - 1))
+
+    # Zero-pad if needed
+    padded_signal =
+      if length(signal_slice) < filter_length do
+        padding = List.duplicate(0.0, filter_length - length(signal_slice))
+        signal_slice ++ padding
+      else
+        signal_slice
+      end
+
+    # Compute convolution
+    Enum.zip(padded_signal, filter_slice)
+    |> Enum.map(fn {s, f} -> s * f end)
+    |> Enum.sum()
   end
 
   defp transpose(matrix) do

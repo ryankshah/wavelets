@@ -15,7 +15,7 @@ defmodule Wavelets.SWT do
           Wavelets.precision()
         ) ::
           {list(list(number)), list(list(number))}
-  def transform_1d(signal, filter, levels, precision \\ :double) do
+  def transform_1d(signal, filter, levels, _precision \\ :double) do
     do_transform_1d(signal, filter, levels, [], [])
   end
 
@@ -24,40 +24,44 @@ defmodule Wavelets.SWT do
   end
 
   defp do_transform_1d(signal, filter, level, approx_acc, detail_acc) do
-    # Apply filters without downsampling
     {approx, details} = undecimated_decomposition(signal, filter)
-
-    # Upsample filter for next level
     next_filter = upsample_filter(filter)
 
-    do_transform_1d(approx, next_filter, level - 1, [approx | approx_acc], [
-      details | detail_acc
-    ])
+    do_transform_1d(
+      approx,
+      next_filter,
+      level - 1,
+      [approx | approx_acc],
+      [details | detail_acc]
+    )
   end
 
-  # Helper functions
   defp undecimated_decomposition(signal, filter) do
-    extended = extend_signal_swt(signal, length(filter.decomposition_low_pass))
+    # Extend signal by periodic padding to maintain length
+    n = length(signal)
+    padded = extend_periodic(signal, n)
 
-    approx = convolve(extended, filter.decomposition_low_pass)
-    details = convolve(extended, filter.decomposition_high_pass)
+    # Apply filters without downsampling
+    approx = convolve_periodic(padded, filter.decomposition_low_pass, n)
+    details = convolve_periodic(padded, filter.decomposition_high_pass, n)
 
     {approx, details}
   end
 
-  defp extend_signal_swt(signal, filter_length) do
-    padding_size = filter_length - 1
-    padding = Enum.take(signal, padding_size)
-    padding ++ signal ++ Enum.reverse(padding)
+  defp extend_periodic(signal, n) do
+    signal ++ Enum.take(signal, n)
   end
 
-  defp convolve(signal, filter) do
-    filter_length = length(filter)
-
-    0..(length(signal) - filter_length)
+  defp convolve_periodic(signal, filter, output_length) do
+    0..(output_length - 1)
     |> Enum.map(fn i ->
-      Enum.zip(Enum.slice(signal, i..(i + filter_length - 1)), filter)
-      |> Enum.map(fn {s, f} -> s * f end)
+      filter
+      |> Enum.with_index()
+      |> Enum.map(fn {f, k} ->
+        # Use periodic indexing
+        idx = rem(i + k, output_length)
+        Enum.at(signal, idx) * f
+      end)
       |> Enum.sum()
     end)
   end
@@ -78,6 +82,6 @@ defmodule Wavelets.SWT do
   end
 
   defp upsample_coefficients(coefficients) do
-    Enum.flat_map(coefficients, &[&1, 0])
+    Enum.flat_map(coefficients, &[&1, 0.0])
   end
 end
