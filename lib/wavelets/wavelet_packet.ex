@@ -3,7 +3,9 @@ defmodule Wavelets.WaveletPacket do
   Implementation of Wavelet Packet decomposition and reconstruction.
   """
 
-  alias Wavelets.{DWT, IDWT, Filter}
+  alias Wavelets.DWT
+  alias Wavelets.Filter
+  alias Wavelets.IDWT
 
   @doc """
   Performs 1D wavelet packet decomposition.
