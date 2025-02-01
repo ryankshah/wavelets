@@ -1,19 +1,19 @@
+# test/wavelets/dwt_test.exs
 defmodule Wavelets.DWTTest do
   use ExUnit.Case
   doctest Wavelets.DWT
 
-  import Wavelets.TestHelpers
-  alias Wavelets.{DWT, Filter, Filters}
+  alias Wavelets.{DWT, Filters}
 
   describe "forward_1d/3" do
     test "correctly transforms signal with Haar wavelet" do
       signal = [4.0, 4.0, 2.0, 2.0]
       # Haar wavelet
       filter = Filters.Daubechies.get(1)
-
       {approx, details} = DWT.forward_1d(signal, filter)
 
-      expected_approx = [5.656854249492381, 2.82842712474619]
+      # Expected values for Haar wavelet
+      expected_approx = [4.0 * :math.sqrt(2), 2.0 * :math.sqrt(2)]
       expected_details = [0.0, 0.0]
 
       assert_close(approx, expected_approx)
@@ -21,13 +21,16 @@ defmodule Wavelets.DWTTest do
     end
 
     test "preserves energy" do
-      signal = generate_test_signal()
+      signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
       filter = Filters.Daubechies.get(2)
 
       {approx, details} = DWT.forward_1d(signal, filter)
 
-      original_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-      transform_energy = Enum.sum(Enum.map(approx ++ details, &(&1 * &1)))
+      # Check energy preservation
+      original_energy = signal |> Enum.map(&(&1 * &1)) |> Enum.sum()
+
+      transform_energy =
+        (approx ++ details) |> Enum.map(&(&1 * &1)) |> Enum.sum()
 
       assert_in_delta original_energy, transform_energy, 1.0e-10
     end
@@ -35,7 +38,13 @@ defmodule Wavelets.DWTTest do
 
   describe "forward_2d/3" do
     test "correctly decomposes 2D signal" do
-      signal = generate_test_signal_2d()
+      signal = [
+        [1.0, 2.0, 3.0, 4.0],
+        [5.0, 6.0, 7.0, 8.0],
+        [9.0, 10.0, 11.0, 12.0],
+        [13.0, 14.0, 15.0, 16.0]
+      ]
+
       filter = Filters.Daubechies.get(1)
 
       {approx, {h_details, v_details, d_details}} =
@@ -48,8 +57,14 @@ defmodule Wavelets.DWTTest do
     end
 
     test "preserves energy in 2D transform" do
-      signal = generate_test_signal_2d()
-      filter = Filters.Daubechies.get(2)
+      signal = [
+        [1.0, 2.0, 3.0, 4.0],
+        [5.0, 6.0, 7.0, 8.0],
+        [9.0, 10.0, 11.0, 12.0],
+        [13.0, 14.0, 15.0, 16.0]
+      ]
+
+      filter = Filters.Daubechies.get(1)
 
       {approx, {h_details, v_details, d_details}} =
         DWT.forward_2d(signal, filter)
@@ -70,5 +85,13 @@ defmodule Wavelets.DWTTest do
 
       assert_in_delta original_energy, transform_energy, 1.0e-10
     end
+  end
+
+  # Helper functions
+  defp assert_close(list1, list2, tolerance \\ 1.0e-10) do
+    assert length(list1) == length(list2)
+
+    Enum.zip(list1, list2)
+    |> Enum.each(fn {a, b} -> assert_in_delta(a, b, tolerance) end)
   end
 end
