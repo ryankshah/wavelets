@@ -1,6 +1,6 @@
 defmodule Wavelets.WaveletPacket do
   @moduledoc """
-  Implementation of Wavelet Packet decomposition and reconstruction with simple scaling
+  Implementation of Wavelet Packet decomposition and reconstruction
   """
 
   alias Wavelets.DWT
@@ -11,9 +11,8 @@ defmodule Wavelets.WaveletPacket do
   Performs 1D wavelet packet decomposition
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    # Start with signal scaled by 2.0 to match DWT expectations
-    scaled_signal = Enum.map(signal, &(&1 * 2.0))
-    tree = %{{0, 0} => scaled_signal}
+    # Store original signal without scaling
+    tree = %{{0, 0} => signal}
 
     # Build each level
     Enum.reduce(1..levels, tree, fn level, acc ->
@@ -30,7 +29,7 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Create new nodes
+    # Create new nodes with DWT (scaling handled in DWT)
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
@@ -55,9 +54,7 @@ defmodule Wavelets.WaveletPacket do
       |> Enum.map(fn {level, _} -> level end)
       |> Enum.max()
 
-    # Reconstruct and unscale the result
     reconstruct_level(tree, filter, max_level)
-    |> Enum.map(&(&1 / 2.0))
   end
 
   defp reconstruct_level(tree, _filter, 0) do

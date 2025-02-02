@@ -30,7 +30,8 @@ defmodule Wavelets.DWT do
           |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
 
-        {approx * :math.sqrt(2), detail * :math.sqrt(2)}  # Orthonormal scaling
+        # Orthonormal scaling
+        {approx * :math.sqrt(2), detail * :math.sqrt(2)}
       end)
       |> Enum.unzip()
 
