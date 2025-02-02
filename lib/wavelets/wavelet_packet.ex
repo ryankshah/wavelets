@@ -3,7 +3,9 @@ defmodule Wavelets.WaveletPacket do
   Implementation of Wavelet Packet decomposition and reconstruction
   """
 
-  alias Wavelets.{DWT, Filter, IDWT}
+  alias Wavelets.DWT
+  alias Wavelets.Filter
+  alias Wavelets.IDWT
 
   @doc """
   Performs 1D wavelet packet decomposition
@@ -24,29 +26,29 @@ defmodule Wavelets.WaveletPacket do
 
   defp decompose_level(tree, filter, level) do
     current_level = level - 1
-    nodes = get_level_nodes(tree, current_level)
 
     new_nodes =
-      nodes
-      |> Enum.flat_map(fn {node_idx, signal} ->
+      for {node_level, j} <- Map.keys(tree),
+          node_level == current_level,
+          signal when is_list(signal) <- [Map.get(tree, {node_level, j})] do
         {approx, details} = DWT.forward_1d(signal, filter)
 
-        [
-          {{level, node_idx * 2}, approx},
-          {{level, node_idx * 2 + 1}, details}
-        ]
-      end)
-      |> Map.new()
+        %{
+          {level, 2 * j} => approx,
+          {level, 2 * j + 1} => details
+        }
+      end
+      |> Enum.reduce(%{}, &Map.merge(&2, &1))
 
-    tree
-    |> Map.merge(new_nodes)
-    |> decompose_level(filter, level - 1)
-  end
+    case Map.size(new_nodes) do
+      0 ->
+        tree
 
-  defp get_level_nodes(tree, level) do
-    tree
-    |> Map.filter(fn {{node_level, _}, _} -> node_level == level end)
-    |> Map.filter(fn {_, signal} -> is_list(signal) end)
+      _ ->
+        tree
+        |> Map.merge(new_nodes)
+        |> decompose_level(filter, level - 1)
+    end
   end
 
   @doc """
@@ -63,9 +65,7 @@ defmodule Wavelets.WaveletPacket do
     reconstruct_level(tree, filter, max_level)
   end
 
-  defp reconstruct_level(tree, _filter, 0) do
-    Map.get(tree, {0, 0})
-  end
+  defp reconstruct_level(tree, _filter, 0), do: Map.get(tree, {0, 0})
 
   defp reconstruct_level(tree, filter, level) do
     max_nodes = trunc(:math.pow(2, level - 1))
@@ -75,12 +75,19 @@ defmodule Wavelets.WaveletPacket do
           approx = Map.get(tree, {level, j * 2}),
           details = Map.get(tree, {level, j * 2 + 1}),
           approx != nil and details != nil do
-        {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
+        reconstructed = IDWT.inverse_1d(approx, details, filter)
+        {{level - 1, j}, reconstructed}
       end
       |> Map.new()
 
-    tree
-    |> Map.merge(new_nodes)
-    |> reconstruct_level(filter, level - 1)
+    case Map.size(new_nodes) do
+      0 ->
+        tree
+
+      _ ->
+        tree
+        |> Map.merge(new_nodes)
+        |> reconstruct_level(filter, level - 1)
+    end
   end
 end

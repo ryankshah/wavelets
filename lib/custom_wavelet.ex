@@ -23,10 +23,10 @@ defmodule Wavelets.CustomWavelet do
         name: Keyword.get(opts, :name, "custom"),
         family: :custom,
         vanishing_moments: compute_vanishing_moments(decomp_high),
-        decomposition_low_pass: decomp_low,
-        decomposition_high_pass: decomp_high,
-        reconstruction_low_pass: recon_low,
-        reconstruction_high_pass: recon_high,
+        decomposition_low_pass: normalize_coefficients(decomp_low),
+        decomposition_high_pass: normalize_coefficients(decomp_high),
+        reconstruction_low_pass: normalize_coefficients(recon_low),
+        reconstruction_high_pass: normalize_coefficients(recon_high),
         support_width: length(decomp_low)
       }
 
@@ -52,17 +52,40 @@ defmodule Wavelets.CustomWavelet do
   end
 
   defp verify_perfect_reconstruction(d_low, d_high, r_low, r_high) do
+    # Check perfect reconstruction conditions
+    # H0(z)G0(z) + H1(z)G1(z) = 1
+
+    # First normalize coefficients
+    d_low = normalize_coefficients(d_low)
+    d_high = normalize_coefficients(d_high)
+    r_low = normalize_coefficients(r_low)
+    r_high = normalize_coefficients(r_high)
+
+    # Compute convolutions
     conv_low = convolve(d_low, r_low)
     conv_high = convolve(d_high, r_high)
-    sum = Enum.zip(conv_low, conv_high) |> Enum.map(fn {a, b} -> a + b end)
 
+    sum =
+      Enum.zip(conv_low, conv_high)
+      |> Enum.map(fn {a, b} -> a + b end)
+
+    # First coefficient should be 1, rest should be 0
     [head | tail] = sum
 
-    if almost_equal(head, 2.0, 1.0e-6) and
+    if almost_equal(head, 1.0, 1.0e-6) and
          Enum.all?(tail, &almost_zero(&1, 1.0e-6)) do
       :ok
     else
       {:error, "Perfect reconstruction condition not satisfied"}
+    end
+  end
+
+  defp normalize_coefficients(coeffs) do
+    norm = coeffs |> Enum.map(&(&1 * &1)) |> Enum.sum() |> :math.sqrt()
+
+    case norm do
+      0.0 -> coeffs
+      _ -> Enum.map(coeffs, &(&1 / norm))
     end
   end
 

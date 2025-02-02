@@ -8,18 +8,43 @@ defmodule Wavelets.Analysis do
   """
   @spec energy_distribution(list(number) | list(list(number))) :: float | map()
   def energy_distribution(coeffs) when is_list(coeffs) do
-    compute_energy(coeffs)
+    case is_list(hd(coeffs)) do
+      true ->
+        coeffs
+        |> List.flatten()
+        |> compute_energy()
+
+      false ->
+        compute_energy(coeffs)
+    end
   end
 
-  defp compute_energy(signal) when is_list(signal) do
-    cond do
-      is_number(hd(signal)) ->
-        # 1D case
-        signal |> Enum.map(&(&1 * &1)) |> Enum.sum()
+  @doc """
+  Computes Shannon entropy of wavelet coefficients
+  """
+  @spec entropy(list(number) | list(list(number))) :: float
+  def entropy(coeffs) when is_list(coeffs) do
+    coeffs
+    |> List.flatten()
+    |> Enum.map(&abs/1)
+    |> normalize()
+    |> Enum.reject(&(&1 <= 0))
+    |> Enum.map(fn p -> -p * :math.log2(p) end)
+    |> Enum.sum()
+  end
 
-      is_list(hd(signal)) ->
-        # 2D case
-        signal |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+  defp compute_energy(signal) do
+    signal
+    |> Enum.map(&(&1 * &1))
+    |> Enum.sum()
+  end
+
+  defp normalize(values) do
+    sum = values |> Enum.map(&abs/1) |> Enum.sum()
+
+    case sum do
+      0.0 -> values
+      _ -> Enum.map(values, &(abs(&1) / sum))
     end
   end
 end

@@ -14,34 +14,31 @@ defmodule Wavelets.DWT do
     n = length(signal)
     half_n = div(n, 2)
 
-    # Compute approximation and detail coefficients
-    {approximation, details} =
+    # Compute approximation coefficients without additional scaling
+    approximation =
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
-        # Get 2-point window
         window = Enum.slice(signal, j..min(j + 1, n - 1))
-        # Pad if needed
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters
-        approx =
-          Enum.zip(window, filter.decomposition_low_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
-          |> Enum.sum()
-          # Scale for energy preservation
-          |> Kernel.*(2)
-
-        detail =
-          Enum.zip(window, filter.decomposition_high_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
-          |> Enum.sum()
-          # Scale for energy preservation
-          |> Kernel.*(2)
-
-        {approx, detail}
+        Enum.zip(window, filter.decomposition_low_pass)
+        |> Enum.map(fn {s, f} -> s * f end)
+        |> Enum.sum()
       end)
-      |> Enum.unzip()
+
+    # Compute detail coefficients without additional scaling
+    details =
+      0..(half_n - 1)
+      |> Enum.map(fn i ->
+        j = 2 * i
+        window = Enum.slice(signal, j..min(j + 1, n - 1))
+        window = if length(window) < 2, do: window ++ [0.0], else: window
+
+        Enum.zip(window, filter.decomposition_high_pass)
+        |> Enum.map(fn {s, f} -> s * f end)
+        |> Enum.sum()
+      end)
 
     {approximation, details}
   end
