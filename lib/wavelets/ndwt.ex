@@ -1,11 +1,10 @@
+# lib/wavelets/ndwt.ex
 defmodule Wavelets.NDWT do
   @moduledoc """
   Implementation of n-dimensional Discrete Wavelet Transform
   """
 
-  alias Wavelets.DWT
-  alias Wavelets.Filter
-  alias Wavelets.IDWT
+  alias Wavelets.{DWT, Filter, IDWT}
 
   @doc """
   Performs n-dimensional forward discrete wavelet transform
@@ -26,15 +25,13 @@ defmodule Wavelets.NDWT do
   end
 
   defp transform_nd(signal, filter, dims, precision) do
-    result =
+    try do
       signal
       |> Enum.map(&forward(&1, filter, dims - 1, precision))
       |> Enum.unzip()
-
-    case result do
-      {approx, details} -> {approx, details}
-      # Fallback for edge cases
-      _ -> {signal, signal}
+    rescue
+      # Return empty lists on error
+      _ -> {[], []}
     end
   end
 
@@ -58,7 +55,12 @@ defmodule Wavelets.NDWT do
   end
 
   defp inverse_transform_nd(approximation, details, filter, dims, precision) do
-    Enum.zip(approximation, details)
-    |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
+    try do
+      Enum.zip(approximation, details)
+      |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
+    rescue
+      # Return empty list on error
+      _ -> []
+    end
   end
 end
