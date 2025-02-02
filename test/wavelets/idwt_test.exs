@@ -12,7 +12,7 @@ defmodule Wavelets.IDWTTest do
     {approx, details} = DWT.forward_1d(original, filter)
     reconstructed = IDWT.inverse_1d(approx, details, filter)
 
-    assert_close(original, reconstructed)
+    assert_close(original, reconstructed, 1.0e-8)
   end
 
   test "perfectly reconstructs signal with Daubechies-4 wavelet" do
@@ -22,7 +22,17 @@ defmodule Wavelets.IDWTTest do
     {approx, details} = DWT.forward_1d(original, filter)
     reconstructed = IDWT.inverse_1d(approx, details, filter)
 
-    assert_close(original, reconstructed)
+    assert_close(original, reconstructed, 1.0e-8)
+
+    # Also verify energy conservation
+    original_energy = Enum.sum(Enum.map(original, &(&1 * &1)))
+
+    transform_energy =
+      (approx ++ details)
+      |> Enum.map(&(&1 * &1))
+      |> Enum.sum()
+
+    assert_in_delta original_energy, transform_energy, 1.0e-8
   end
 
   test "perfectly reconstructs 2D signal" do
@@ -38,6 +48,23 @@ defmodule Wavelets.IDWTTest do
     {approx, details} = DWT.forward_2d(original, filter)
     reconstructed = IDWT.inverse_2d(approx, details, filter)
 
-    assert_close_2d(original, reconstructed)
+    assert_close_2d(original, reconstructed, 1.0e-8)
+
+    # Verify energy conservation
+    original_energy =
+      original
+      |> List.flatten()
+      |> Enum.map(&(&1 * &1))
+      |> Enum.sum()
+
+    transform_energy =
+      (List.flatten(approx) ++
+         List.flatten(elem(details, 0)) ++
+         List.flatten(elem(details, 1)) ++
+         List.flatten(elem(details, 2)))
+      |> Enum.map(&(&1 * &1))
+      |> Enum.sum()
+
+    assert_in_delta original_energy, transform_energy, 1.0e-8
   end
 end

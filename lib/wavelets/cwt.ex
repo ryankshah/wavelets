@@ -1,6 +1,6 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform
+  Implementation of the Continuous Wavelet Transform with corrected energy preservation
   """
 
   alias Wavelets.Utils.Complex
@@ -20,35 +20,17 @@ defmodule Wavelets.CWT do
     dt = 1.0
     signal_length = length(signal)
 
-    # Compute normalization factor
-    signal_energy = signal |> Enum.map(&(&1 * &1)) |> Enum.sum()
-
     # Transform at each scale
     Enum.map(scales, fn scale ->
-      coeffs =
-        transform_at_scale(
-          signal,
-          wavelet_fn,
-          scale,
-          dt,
-          signal_length,
-          signal_energy
-        )
-
+      coeffs = transform_at_scale(signal, wavelet_fn, scale, dt, signal_length)
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(
-         signal,
-         wavelet_fn,
-         scale,
-         dt,
-         signal_length,
-         signal_energy
-       ) do
+  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
     window_size = max(10, trunc(2 * scale))
-    scale_factor = :math.sqrt(dt / (scale * signal_energy))
+    # Corrected scale factor for energy preservation
+    scale_factor = :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->

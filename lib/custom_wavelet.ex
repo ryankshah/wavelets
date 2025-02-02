@@ -1,6 +1,6 @@
 defmodule Wavelets.CustomWavelet do
   @moduledoc """
-  Tools for designing custom wavelets and verifying their properties
+  Tools for designing custom wavelets and verifying their properties with corrected vanishing moments calculation
   """
 
   alias Wavelets.Filter
@@ -70,12 +70,12 @@ defmodule Wavelets.CustomWavelet do
   end
 
   defp compute_vanishing_moments(high_pass) do
-    1..10
-    |> Enum.find(1, fn m ->
+    # Start from 0 instead of 1 for correct vanishing moments calculation
+    0..9
+    |> Enum.find(0, fn m ->
       moments = compute_moments(high_pass, m)
       not almost_zero(moments)
     end)
-    |> Kernel.-(1)
   end
 
   defp compute_moments(coeffs, order) do

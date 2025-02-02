@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform
+  Implementation of the Discrete Wavelet Transform with corrected energy preservation
   """
 
   alias Wavelets.Filter
@@ -22,15 +22,15 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters
+        # Apply filters without extra scaling - coefficients are already normalized
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
-          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
-          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
 
         {approx, detail}
@@ -64,20 +64,9 @@ defmodule Wavelets.DWT do
       |> Enum.unzip()
       |> then(fn {h, d} -> {transpose(h), transpose(d)} end)
 
-    # Scale for energy preservation
-    scale = 1 / :math.sqrt(2)
-
-    scale_matrix = fn matrix ->
-      Enum.map(matrix, fn row -> Enum.map(row, &(&1 * scale)) end)
-    end
-
     {
-      scale_matrix.(approximation),
-      {
-        scale_matrix.(horizontal_details),
-        scale_matrix.(vertical_details),
-        scale_matrix.(diagonal_details)
-      }
+      approximation,
+      {horizontal_details, vertical_details, diagonal_details}
     }
   end
 
