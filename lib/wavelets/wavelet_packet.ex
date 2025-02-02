@@ -1,7 +1,6 @@
 defmodule Wavelets.WaveletPacket do
   @moduledoc """
-  Implementation of Wavelet Packet decomposition and reconstruction
-  that maintains orthonormality and energy preservation
+  Implementation of Wavelet Packet decomposition and reconstruction with simple scaling
   """
 
   alias Wavelets.DWT
@@ -9,15 +8,16 @@ defmodule Wavelets.WaveletPacket do
   alias Wavelets.IDWT
 
   @doc """
-  Performs 1D wavelet packet decomposition ensuring orthonormality
+  Performs 1D wavelet packet decomposition
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    # Start with root node containing original signal
-    base_tree = %{{0, 0} => signal}
+    # Start with signal scaled by 2.0 to match DWT expectations
+    scaled_signal = Enum.map(signal, &(&1 * 2.0))
+    tree = %{{0, 0} => scaled_signal}
 
     # Build each level
-    Enum.reduce(1..levels, base_tree, fn level, tree ->
-      build_level(tree, filter, level)
+    Enum.reduce(1..levels, tree, fn level, acc ->
+      build_level(acc, filter, level)
     end)
   end
 
@@ -30,7 +30,7 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Create new nodes using DWT (which now has correct scaling)
+    # Create new nodes
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
@@ -47,7 +47,6 @@ defmodule Wavelets.WaveletPacket do
 
   @doc """
   Reconstructs signal from wavelet packet decomposition
-  ensuring perfect reconstruction
   """
   def reconstruct_1d(tree, filter, _precision \\ :double) do
     max_level =
@@ -56,8 +55,9 @@ defmodule Wavelets.WaveletPacket do
       |> Enum.map(fn {level, _} -> level end)
       |> Enum.max()
 
-    # Reconstruct from the highest level down
+    # Reconstruct and unscale the result
     reconstruct_level(tree, filter, max_level)
+    |> Enum.map(&(&1 / 2.0))
   end
 
   defp reconstruct_level(tree, _filter, 0) do
@@ -65,18 +65,15 @@ defmodule Wavelets.WaveletPacket do
   end
 
   defp reconstruct_level(tree, filter, level) do
-    # Process all node pairs at current level
     nodes =
       for j <- 0..(:math.pow(2, level - 1) |> trunc() |> Kernel.-(1)),
           approx = Map.get(tree, {level, j * 2}),
           details = Map.get(tree, {level, j * 2 + 1}),
           approx != nil and details != nil do
-        # IDWT will handle proper scaling
         {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
       end
       |> Map.new()
 
-    # Continue reconstruction at next level up
     Map.merge(tree, nodes)
     |> reconstruct_level(filter, level - 1)
   end

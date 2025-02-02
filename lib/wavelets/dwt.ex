@@ -1,12 +1,12 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform with corrected orthogonality
+  Implementation of the Discrete Wavelet Transform matching academic standards
   """
 
   alias Wavelets.Filter
 
   @doc """
-  Performs 1D forward discrete wavelet transform ensuring perfect reconstruction
+  Performs 1D forward discrete wavelet transform
   """
   def forward_1d(signal, filter, _precision \\ :double) do
     n = length(signal)
@@ -16,21 +16,24 @@ defmodule Wavelets.DWT do
       0..(half_n - 1)
       |> Enum.map(fn i ->
         j = 2 * i
+        # Get 2-point window
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply decomposition filters with orthonormal normalization
+        # Apply filters without normalization
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
-          # Multiply by 2 for orthonormality
-          |> Enum.map(fn {s, f} -> s * f * 2.0 end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
+          # Single scaling factor here
+          |> Kernel.*(2.0)
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
-          # Multiply by 2 for orthonormality
-          |> Enum.map(fn {s, f} -> s * f * 2.0 end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
+          # Single scaling factor here
+          |> Kernel.*(2.0)
 
         {approx, detail}
       end)
@@ -60,6 +63,7 @@ defmodule Wavelets.DWT do
       |> Enum.unzip()
       |> then(fn {h, d} -> {transpose(h), transpose(d)} end)
 
+    # No extra scaling needed for 2D
     {approximation, {horizontal_details, vertical_details, diagonal_details}}
   end
 
