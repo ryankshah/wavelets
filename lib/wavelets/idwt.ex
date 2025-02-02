@@ -1,6 +1,6 @@
 defmodule Wavelets.IDWT do
   @moduledoc """
-  Implementation of the Inverse Discrete Wavelet Transform that matches the DWT implementation
+  Implementation of the Inverse Discrete Wavelet Transform with corrected orthogonality
   """
 
   alias Wavelets.Filter
@@ -14,14 +14,15 @@ defmodule Wavelets.IDWT do
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
-      # Apply coefficients directly
+      # Get coefficients and apply reconstruction filters
       a = Enum.at(approximation, pos, 0.0)
       d = Enum.at(details, pos, 0.0)
 
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      a * r_low + d * r_high
+      # Divide by 2 for orthonormality
+      (a * r_low + d * r_high) / 2.0
     end)
   end
 
