@@ -2,14 +2,15 @@ defmodule Wavelets.CustomWavelet do
   @moduledoc """
   Tools for designing custom wavelets and verifying their properties
   """
-  
+
   alias Wavelets.Filter
 
   @doc """
   Creates a custom wavelet filter from given coefficients
   """
   def create(decomp_low, decomp_high, recon_low, recon_high, opts \\ []) do
-    with :ok <- verify_length_match(decomp_low, decomp_high, recon_low, recon_high) do
+    with :ok <-
+           verify_length_match(decomp_low, decomp_high, recon_low, recon_high) do
       filter = %Filter{
         name: Keyword.get(opts, :name, "custom"),
         family: :custom,
@@ -20,7 +21,7 @@ defmodule Wavelets.CustomWavelet do
         reconstruction_high_pass: recon_high,
         support_width: length(decomp_low)
       }
-      
+
       {:ok, filter}
     end
   end
@@ -44,7 +45,10 @@ defmodule Wavelets.CustomWavelet do
 
   defp verify_length_match(d_low, d_high, r_low, r_high) do
     lengths = [length(d_low), length(d_high), length(r_low), length(r_high)]
-    if Enum.uniq(lengths) |> length() == 1, do: :ok, else: {:error, "Filter lengths must match"}
+
+    if Enum.uniq(lengths) |> length() == 1,
+      do: :ok,
+      else: {:error, "Filter lengths must match"}
   end
 
   defp generate_qmf(coeffs) do
