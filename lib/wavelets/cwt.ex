@@ -1,39 +1,31 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with proper energy preservation
+  Implementation of the Continuous Wavelet Transform with corrected energy preservation
   """
 
   alias Wavelets.Utils.Complex
 
   @doc """
-  Performs 1D continuous wavelet transform with proper energy preservation
+  Performs 1D continuous wavelet transform
   """
   def transform_1d(signal, wavelet_fn, scales, _precision \\ :double) do
     dt = 1.0
     signal_length = length(signal)
+
+    # Pre-compute normalization factors
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-    total_scale = Enum.sum(scales)
+    normalizing_factor = 1 / :math.sqrt(signal_energy)
 
     # Transform at each scale with proper normalization
-    scales
-    |> Enum.map(fn scale ->
-      # Normalize wavelet for admissibility
-      normalized_wavelet = fn x ->
-        {re, im} = wavelet_fn.(x)
-        norm = :math.sqrt(scale * signal_energy / total_scale)
-        {re / norm, im / norm}
-      end
-
-      coeffs =
-        transform_at_scale(signal, normalized_wavelet, scale, dt, signal_length)
-
+    Enum.map(scales, fn scale ->
+      coeffs = transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, normalizing_factor)
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Increased window size for better localization
-    window_size = max(10, trunc(4 * scale))
+  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, normalizing_factor) do
+    # Use scale-dependent window size for better localization
+    window_size = max(10, trunc(6 * scale))
     scale_factor = :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
@@ -45,9 +37,9 @@ defmodule Wavelets.CWT do
         scale,
         dt,
         window_size,
-        signal_length
+        signal_length,
+        normalizing_factor * scale_factor
       )
-      |> scale_coefficient(scale_factor)
     end)
   end
 
@@ -58,25 +50,23 @@ defmodule Wavelets.CWT do
          scale,
          dt,
          window_size,
-         signal_length
+         signal_length,
+         total_scale_factor
        ) do
-    -window_size..window_size
-    |> Enum.map(
-      &compute_point(pos + &1, signal, wavelet_fn, scale, dt, signal_length)
-    )
-    |> Enum.reduce({0.0, 0.0}, &Complex.add/2)
-  end
+    start_idx = max(0, pos - window_size)
+    end_idx = min(signal_length - 1, pos + window_size)
 
-  defp compute_point(pos, signal, wavelet_fn, scale, dt, signal_length) do
-    if pos >= 0 and pos < signal_length do
-      t = pos * dt / scale
-      {re, im} = wavelet_fn.(t)
-      signal_val = Enum.at(signal, pos)
-      {signal_val * re, signal_val * im}
-    else
-      # Zero padding
-      {0.0, 0.0}
-    end
+    coeff =
+      start_idx..end_idx
+      |> Enum.map(fn i ->
+        t = (i - pos) * dt / scale
+        {re, im} = wavelet_fn.(t)
+        signal_val = Enum.at(signal, i)
+        {signal_val * re, signal_val * im}
+      end)
+      |> Enum.reduce({0.0, 0.0}, &Complex.add/2)
+
+    scale_coefficient(coeff, total_scale_factor)
   end
 
   defp scale_coefficient({re, im}, scale_factor) do

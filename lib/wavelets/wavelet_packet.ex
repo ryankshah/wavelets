@@ -8,14 +8,11 @@ defmodule Wavelets.WaveletPacket do
   alias Wavelets.IDWT
 
   @doc """
-  Performs 1D wavelet packet decomposition with proper energy preservation
+  Performs 1D wavelet packet decomposition
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
     # Start with root node
-    # Add proper scaling
-    scale_factor = :math.sqrt(2)
-    scaled_signal = Enum.map(signal, &(&1 / scale_factor))
-    tree = %{{0, 0} => scaled_signal}
+    tree = %{{0, 0} => signal}
 
     # Build each level
     Enum.reduce(1..levels, tree, fn level, acc ->
@@ -25,7 +22,6 @@ defmodule Wavelets.WaveletPacket do
 
   defp build_level(tree, filter, level) do
     prev_level = level - 1
-    scale_factor = :math.sqrt(2)
 
     # Get all nodes from previous level
     prev_nodes =
@@ -33,18 +29,14 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Create new nodes
+    # Create new nodes using DWT
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
 
-        # Scale coefficients for energy preservation
-        scaled_approx = Enum.map(approx, &(&1 / scale_factor))
-        scaled_details = Enum.map(details, &(&1 / scale_factor))
-
         [
-          {{level, j * 2}, scaled_approx},
-          {{level, j * 2 + 1}, scaled_details}
+          {{level, j * 2}, approx},
+          {{level, j * 2 + 1}, details}
         ]
       end)
       |> Map.new()
@@ -62,12 +54,7 @@ defmodule Wavelets.WaveletPacket do
       |> Enum.map(fn {level, _} -> level end)
       |> Enum.max()
 
-    # Compensate for total scaling
-    scale_factor = :math.pow(2, max_level / 2)
-
     reconstruct_level(tree, filter, max_level)
-    # Apply final scaling
-    |> Enum.map(&(&1 * scale_factor))
   end
 
   defp reconstruct_level(tree, _filter, 0) do
@@ -80,12 +67,7 @@ defmodule Wavelets.WaveletPacket do
           approx = Map.get(tree, {level, j * 2}),
           details = Map.get(tree, {level, j * 2 + 1}),
           approx != nil and details != nil do
-        # Scale for reconstruction
-        scale_factor = :math.sqrt(2)
-        scaled_approx = Enum.map(approx, &(&1 * scale_factor))
-        scaled_details = Enum.map(details, &(&1 * scale_factor))
-
-        {{level - 1, j}, IDWT.inverse_1d(scaled_approx, scaled_details, filter)}
+        {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
       end
       |> Map.new()
 

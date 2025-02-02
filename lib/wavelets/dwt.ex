@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform with proper scaling
+  Implementation of the Discrete Wavelet Transform with corrected scaling
   """
 
   alias Wavelets.Filter
@@ -20,22 +20,21 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters with proper scaling
+        # Apply filters with sqrt(2) scaling for orthonormality
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
+          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
           |> Enum.sum()
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
+          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
           |> Enum.sum()
 
         {approx, detail}
       end)
       |> Enum.unzip()
 
-    # Return with proper scaling
     {approximation, details}
   end
 
@@ -60,22 +59,7 @@ defmodule Wavelets.DWT do
       |> Enum.unzip()
       |> then(fn {h, d} -> {transpose(h), transpose(d)} end)
 
-    # Apply proper scaling for 2D transform
-    # Scale factor for 2D transform
-    scale = 1 / 2
-
-    scale_matrix = fn matrix ->
-      Enum.map(matrix, fn row -> Enum.map(row, &(&1 * scale)) end)
-    end
-
-    {
-      scale_matrix.(approximation),
-      {
-        scale_matrix.(horizontal_details),
-        scale_matrix.(vertical_details),
-        scale_matrix.(diagonal_details)
-      }
-    }
+    {approximation, {horizontal_details, vertical_details, diagonal_details}}
   end
 
   defp transpose(matrix) do
