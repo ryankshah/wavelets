@@ -1,6 +1,6 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform matching DWT scaling convention
+  Implementation of the Continuous Wavelet Transform with proper normalization
   """
 
   alias Wavelets.Utils.Complex
@@ -12,7 +12,11 @@ defmodule Wavelets.CWT do
     dt = 1.0
     signal_length = length(signal)
 
-    # Calculate signal properties
+    # Calculate signal energy for proper normalization
+    signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+    energy_factor = :math.sqrt(signal_energy)
+
+    # Center signal
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
@@ -25,43 +29,48 @@ defmodule Wavelets.CWT do
           wavelet_fn,
           scale,
           dt,
-          signal_length
+          signal_length,
+          energy_factor
         )
 
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Use scale-dependent window size for better localization
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         energy_factor
+       ) do
+    # Improved window size calculation
     window_size = min(signal_length - 1, max(10, round(4 * scale)))
 
-    # Include factor of 2 to match DWT scaling
-    scale_factor = 2.0 * :math.sqrt(dt / scale)
+    # Scale factor includes energy normalization
+    scale_factor = :math.sqrt(dt / scale) / energy_factor
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
-      # Calculate window boundaries
+      # Compute coefficients with proper boundaries
       start_idx = max(0, pos - window_size)
       end_idx = min(signal_length - 1, pos + window_size)
 
-      # Compute wavelet coefficients
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          # Time point relative to current position
           t = (i - pos) * dt / scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # Accumulate complex product
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      # Apply scale normalization with DWT convention
+      # Apply normalization while preserving phase
       {re * scale_factor, im * scale_factor}
     end)
   end

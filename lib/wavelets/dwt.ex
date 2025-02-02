@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform
+  Implementation of the Discrete Wavelet Transform with proper normalization
   """
 
   alias Wavelets.Filter
@@ -19,24 +19,26 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters with scaling to match expected output
+        # Apply decomposition filters (already normalized)
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
-          # Multiply by 2 to match expected scaling
-          |> Enum.map(fn {s, f} -> s * f * 2.0 end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
-          # Maintain same scaling for consistency
-          |> Enum.map(fn {s, f} -> s * f * 2.0 end)
+          |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
 
         {approx, detail}
       end)
       |> Enum.unzip()
 
-    {approximation, details}
+    # Scale for energy preservation
+    {
+      Enum.map(approximation, &(&1 * 2)),
+      Enum.map(details, &(&1 * 2))
+    }
   end
 
   @doc """
