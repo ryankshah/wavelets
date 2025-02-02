@@ -25,14 +25,15 @@ defmodule Wavelets.NDWT do
   end
 
   defp transform_nd(signal, filter, dims, precision) do
-    try do
-      signal
-      |> Enum.map(&forward(&1, filter, dims - 1, precision))
-      |> Enum.unzip()
-    rescue
-      # Return empty lists on error
-      _ -> {[], []}
-    end
+    # try do
+    signal
+    |> Enum.map(&forward(&1, filter, dims - 1, precision))
+    |> Enum.unzip()
+
+    # rescue
+    #   # Return empty lists on error
+    #   _ -> {[], []}
+    # end
   end
 
   @doc """
@@ -55,12 +56,13 @@ defmodule Wavelets.NDWT do
   end
 
   defp inverse_transform_nd(approximation, details, filter, dims, precision) do
-    try do
-      Enum.zip(approximation, details)
-      |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
-    rescue
-      # Return empty list on error
-      _ -> []
-    end
+    # try do
+    Enum.zip(approximation, details)
+    |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
+
+    # rescue
+    #   # Return empty list on error
+    #   _ -> []
+    # end
   end
 end
