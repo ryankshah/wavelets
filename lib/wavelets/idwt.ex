@@ -1,6 +1,6 @@
 defmodule Wavelets.IDWT do
   @moduledoc """
-  Implementation of the Inverse Discrete Wavelet Transform with matching scaling
+  Implementation of the Inverse Discrete Wavelet Transform without additional scaling
   """
 
   alias Wavelets.Filter
@@ -20,8 +20,7 @@ defmodule Wavelets.IDWT do
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      # Apply inverse scaling to match forward transform
-      (a * r_low + d * r_high) / :math.sqrt(2)
+      a * r_low + d * r_high
     end)
   end
 

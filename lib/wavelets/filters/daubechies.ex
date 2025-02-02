@@ -1,6 +1,6 @@
 defmodule Wavelets.Filters.Daubechies do
   @moduledoc """
-  Implementation of Daubechies wavelet filters.
+  Implementation of Daubechies wavelet filters with normalized coefficients
   """
 
   alias Wavelets.Filter
@@ -11,52 +11,38 @@ defmodule Wavelets.Filters.Daubechies do
   def get(vanishing_moments) when vanishing_moments > 0 do
     case vanishing_moments do
       1 ->
-        # Daubechies 2 (same as Haar)
+        # Haar wavelet with proper normalization
+        # Instead of 0.7071067811865476
+        h0 = 1 / :math.sqrt(2)
+
         %Filter{
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          decomposition_low_pass: [0.7071067811865476, 0.7071067811865476],
-          decomposition_high_pass: [-0.7071067811865476, 0.7071067811865476],
-          reconstruction_low_pass: [0.7071067811865476, 0.7071067811865476],
-          reconstruction_high_pass: [0.7071067811865476, -0.7071067811865476],
+          decomposition_low_pass: [h0, h0],
+          decomposition_high_pass: [-h0, h0],
+          reconstruction_low_pass: [h0, h0],
+          reconstruction_high_pass: [h0, -h0],
           support_width: 2
         }
 
       2 ->
-        # Daubechies 4
+        # Daubechies-4 with proper normalization
+        h0 = (1 + :math.sqrt(3)) / (4 * :math.sqrt(2))
+        h1 = (3 + :math.sqrt(3)) / (4 * :math.sqrt(2))
+        h2 = (3 - :math.sqrt(3)) / (4 * :math.sqrt(2))
+        h3 = (1 - :math.sqrt(3)) / (4 * :math.sqrt(2))
+
         %Filter{
           name: "db2",
           family: :daubechies,
           vanishing_moments: 2,
-          decomposition_low_pass: [
-            0.4829629131445341,
-            0.8365163037378079,
-            0.2241438680420134,
-            -0.1294095225512604
-          ],
-          decomposition_high_pass: [
-            -0.1294095225512604,
-            -0.2241438680420134,
-            0.8365163037378079,
-            -0.4829629131445341
-          ],
-          reconstruction_low_pass: [
-            0.4829629131445341,
-            0.8365163037378079,
-            0.2241438680420134,
-            -0.1294095225512604
-          ],
-          reconstruction_high_pass: [
-            -0.1294095225512604,
-            0.2241438680420134,
-            0.8365163037378079,
-            0.4829629131445341
-          ],
+          decomposition_low_pass: [h0, h1, h2, h3],
+          decomposition_high_pass: [-h3, h2, -h1, h0],
+          reconstruction_low_pass: [h0, h1, h2, h3],
+          reconstruction_high_pass: [h3, -h2, h1, -h0],
           support_width: 4
         }
-
-        # Add more vanishing moments as needed
     end
   end
 end

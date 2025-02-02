@@ -1,6 +1,6 @@
 defmodule Wavelets.WaveletPacket do
   @moduledoc """
-  Implementation of Wavelet Packet decomposition and reconstruction with proper scaling
+  Implementation of Wavelet Packet decomposition and reconstruction without additional scaling
   """
 
   alias Wavelets.DWT
@@ -29,7 +29,7 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Create new nodes using DWT
+    # Create new nodes
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
