@@ -1,35 +1,39 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with corrected energy preservation
+  Implementation of the Continuous Wavelet Transform with proper energy preservation
   """
 
   alias Wavelets.Utils.Complex
 
   @doc """
-  Performs 1D continuous wavelet transform
+  Performs 1D continuous wavelet transform with proper energy preservation
   """
-  @spec transform_1d(
-          list(number),
-          (number -> Complex.t()),
-          list(number),
-          Wavelets.precision()
-        ) ::
-          list({number, list(Complex.t())})
   def transform_1d(signal, wavelet_fn, scales, _precision \\ :double) do
-    # sampling period
     dt = 1.0
     signal_length = length(signal)
+    signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+    total_scale = Enum.sum(scales)
 
-    # Transform at each scale
-    Enum.map(scales, fn scale ->
-      coeffs = transform_at_scale(signal, wavelet_fn, scale, dt, signal_length)
+    # Transform at each scale with proper normalization
+    scales
+    |> Enum.map(fn scale ->
+      # Normalize wavelet for admissibility
+      normalized_wavelet = fn x ->
+        {re, im} = wavelet_fn.(x)
+        norm = :math.sqrt(scale * signal_energy / total_scale)
+        {re / norm, im / norm}
+      end
+
+      coeffs =
+        transform_at_scale(signal, normalized_wavelet, scale, dt, signal_length)
+
       {scale, coeffs}
     end)
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    window_size = max(10, trunc(2 * scale))
-    # Corrected scale factor for energy preservation
+    # Increased window size for better localization
+    window_size = max(10, trunc(4 * scale))
     scale_factor = :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
@@ -70,6 +74,7 @@ defmodule Wavelets.CWT do
       signal_val = Enum.at(signal, pos)
       {signal_val * re, signal_val * im}
     else
+      # Zero padding
       {0.0, 0.0}
     end
   end

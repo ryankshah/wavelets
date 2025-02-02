@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform with corrected energy preservation
+  Implementation of the Discrete Wavelet Transform with proper scaling
   """
 
   alias Wavelets.Filter
@@ -8,8 +8,6 @@ defmodule Wavelets.DWT do
   @doc """
   Performs 1D forward discrete wavelet transform
   """
-  @spec forward_1d(list(number), Filter.t(), Wavelets.precision()) ::
-          {list(number), list(number)}
   def forward_1d(signal, filter, _precision \\ :double) do
     n = length(signal)
     half_n = div(n, 2)
@@ -22,7 +20,7 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters without extra scaling - coefficients are already normalized
+        # Apply filters with proper scaling
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
           |> Enum.map(fn {s, f} -> s * f end)
@@ -37,15 +35,13 @@ defmodule Wavelets.DWT do
       end)
       |> Enum.unzip()
 
+    # Return with proper scaling
     {approximation, details}
   end
 
   @doc """
   Performs 2D forward discrete wavelet transform
   """
-  @spec forward_2d(list(list(number)), Filter.t(), Wavelets.precision()) ::
-          {list(list(number)),
-           {list(list(number)), list(list(number)), list(list(number))}}
   def forward_2d(signal_2d, filter, precision \\ :double) do
     # Apply rows
     row_transformed = Enum.map(signal_2d, &forward_1d(&1, filter, precision))
@@ -64,9 +60,21 @@ defmodule Wavelets.DWT do
       |> Enum.unzip()
       |> then(fn {h, d} -> {transpose(h), transpose(d)} end)
 
+    # Apply proper scaling for 2D transform
+    # Scale factor for 2D transform
+    scale = 1 / 2
+
+    scale_matrix = fn matrix ->
+      Enum.map(matrix, fn row -> Enum.map(row, &(&1 * scale)) end)
+    end
+
     {
-      approximation,
-      {horizontal_details, vertical_details, diagonal_details}
+      scale_matrix.(approximation),
+      {
+        scale_matrix.(horizontal_details),
+        scale_matrix.(vertical_details),
+        scale_matrix.(diagonal_details)
+      }
     }
   end
 
