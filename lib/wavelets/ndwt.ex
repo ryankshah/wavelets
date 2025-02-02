@@ -17,15 +17,19 @@ defmodule Wavelets.NDWT do
         DWT.forward_2d(signal, filter, precision)
 
       _ when dims > 2 ->
-        # Handle higher dimensions recursively
+        # Handle higher dimensions
         {approx, details} =
           signal
           |> Enum.map(&forward(&1, filter, dims - 1, precision))
           |> Enum.unzip()
 
-        # Scale for higher dimensions
-        scale = :math.pow(:math.sqrt(2), dims - 2)
-        {scale_recursive(approx, scale), scale_recursive(details, scale)}
+        # Scale by 2 for each additional dimension above 2
+        scale = :math.pow(2, dims - 2)
+
+        {
+          scale_recursive(approx, scale),
+          scale_recursive(details, scale)
+        }
     end
   end
 
@@ -42,18 +46,17 @@ defmodule Wavelets.NDWT do
         IDWT.inverse_2d(approximation, details, filter, precision)
 
       _ when dims > 2 ->
-        # Remove dimension scaling before reconstruction
-        scale = :math.pow(:math.sqrt(2), -(dims - 2))
+        # Compensate for dimension scaling
+        scale = 1 / :math.pow(2, dims - 2)
         descaled_approx = scale_recursive(approximation, scale)
         descaled_details = scale_recursive(details, scale)
 
-        # Reconstruct recursively
         Enum.zip(descaled_approx, descaled_details)
         |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
     end
   end
 
-  # Recursive scaling that handles all data types
+  # Handle all data types for recursive scaling
   defp scale_recursive(data, scale) when is_number(data), do: data * scale
 
   defp scale_recursive(data, scale) when is_list(data) do

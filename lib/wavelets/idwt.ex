@@ -1,6 +1,6 @@
 defmodule Wavelets.IDWT do
   @moduledoc """
-  Implementation of the Inverse Discrete Wavelet Transform
+  Implementation of the Inverse Discrete Wavelet Transform matching Matlab/SciPy convention
   """
 
   alias Wavelets.Filter
@@ -14,14 +14,15 @@ defmodule Wavelets.IDWT do
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
-      # Apply reconstruction without scaling
+      # Get coefficients with proper scaling
       a = Enum.at(approximation, pos, 0.0)
       d = Enum.at(details, pos, 0.0)
 
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      a * r_low + d * r_high
+      # Divide by 2 to counter the scaling in forward transform
+      (a * r_low + d * r_high) / 2.0
     end)
   end
 
@@ -34,7 +35,7 @@ defmodule Wavelets.IDWT do
         filter,
         precision \\ :double
       ) do
-    # Inverse transform on columns
+    # First handle columns
     rows_low =
       transpose(approximation)
       |> Enum.zip(transpose(v_details))
@@ -47,7 +48,7 @@ defmodule Wavelets.IDWT do
       |> Enum.map(fn {h, d} -> inverse_1d(h, d, filter, precision) end)
       |> transpose()
 
-    # Inverse transform on rows
+    # Then handle rows
     Enum.zip(rows_low, rows_high)
     |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
   end

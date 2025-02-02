@@ -1,6 +1,6 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with proper normalization
+  Implementation of the Continuous Wavelet Transform matching DWT scaling convention
   """
 
   alias Wavelets.Utils.Complex
@@ -12,7 +12,7 @@ defmodule Wavelets.CWT do
     dt = 1.0
     signal_length = length(signal)
 
-    # Don't normalize signal energy to match DWT convention
+    # Calculate signal properties
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
@@ -33,11 +33,11 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Use adaptive window sized to scale
-    window_size = max(10, min(signal_length - 1, round(6.0 * scale)))
+    # Use scale-dependent window size for better localization
+    window_size = min(signal_length - 1, max(10, round(4 * scale)))
 
-    # Basic scale normalization without energy term
-    base_scale = :math.sqrt(1 / scale)
+    # Include factor of 2 to match DWT scaling
+    scale_factor = 2.0 * :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -45,22 +45,40 @@ defmodule Wavelets.CWT do
       start_idx = max(0, pos - window_size)
       end_idx = min(signal_length - 1, pos + window_size)
 
-      # Compute coefficients for this position
+      # Compute wavelet coefficients
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+          # Time point relative to current position
           t = (i - pos) * dt / scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
+          # Accumulate complex product
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      # Apply scale normalization
-      {re * base_scale, im * base_scale}
+      # Apply scale normalization with DWT convention
+      {re * scale_factor, im * scale_factor}
     end)
+  end
+
+  @doc """
+  Computes energy at each scale
+  """
+  def compute_scale_energy(coeffs) do
+    coeffs
+    |> Enum.map(fn {re, im} -> re * re + im * im end)
+    |> Enum.sum()
+  end
+
+  @doc """
+  Computes coefficient magnitude
+  """
+  def coefficient_magnitude({re, im}) do
+    :math.sqrt(re * re + im * im)
   end
 end
