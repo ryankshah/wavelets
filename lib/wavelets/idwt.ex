@@ -1,6 +1,6 @@
 defmodule Wavelets.IDWT do
   @moduledoc """
-  Implementation of the Inverse Discrete Wavelet Transform with corrected normalization
+  Implementation of the Inverse Discrete Wavelet Transform that matches the DWT implementation
   """
 
   alias Wavelets.Filter
@@ -10,15 +10,13 @@ defmodule Wavelets.IDWT do
   """
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
     n = length(approximation)
-    # Normalization scale
-    scale = :math.sqrt(2)
 
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
-      # Scale coefficients before reconstruction
-      a = Enum.at(approximation, pos, 0.0) * scale
-      d = Enum.at(details, pos, 0.0) * scale
+      # Apply coefficients directly
+      a = Enum.at(approximation, pos, 0.0)
+      d = Enum.at(details, pos, 0.0)
 
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
@@ -36,29 +34,16 @@ defmodule Wavelets.IDWT do
         filter,
         precision \\ :double
       ) do
-    # Additional scale for 2D
-    scale = :math.sqrt(2)
-
-    # Scale inputs
-    scale_matrix = fn matrix ->
-      Enum.map(matrix, fn row -> Enum.map(row, &(&1 * scale)) end)
-    end
-
-    scaled_approx = scale_matrix.(approximation)
-    scaled_h = scale_matrix.(h_details)
-    scaled_v = scale_matrix.(v_details)
-    scaled_d = scale_matrix.(d_details)
-
     # Inverse transform on columns
     rows_low =
-      transpose(scaled_approx)
-      |> Enum.zip(transpose(scaled_v))
+      transpose(approximation)
+      |> Enum.zip(transpose(v_details))
       |> Enum.map(fn {a, d} -> inverse_1d(a, d, filter, precision) end)
       |> transpose()
 
     rows_high =
-      transpose(scaled_h)
-      |> Enum.zip(transpose(scaled_d))
+      transpose(h_details)
+      |> Enum.zip(transpose(d_details))
       |> Enum.map(fn {h, d} -> inverse_1d(h, d, filter, precision) end)
       |> transpose()
 

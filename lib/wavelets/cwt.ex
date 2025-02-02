@@ -1,55 +1,43 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with corrected normalization
+  Implementation of the Continuous Wavelet Transform
   """
 
   alias Wavelets.Utils.Complex
 
   @doc """
-  Performs 1D continuous wavelet transform with proper energy preservation
+  Performs 1D continuous wavelet transform with proper normalization
   """
   def transform_1d(signal, wavelet_fn, scales, _precision \\ :double) do
     dt = 1.0
     signal_length = length(signal)
 
-    # Compute signal norm for energy conservation
-    signal_norm =
-      signal
-      |> Enum.map(&(&1 * &1))
-      |> Enum.sum()
-      |> :math.sqrt()
+    # Compute mean of signal for admissibility condition
+    signal_mean = Enum.sum(signal) / signal_length
+    centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Transform at each scale with proper normalization
+    # Transform at each scale
     scales
     |> Enum.map(fn scale ->
       coeffs =
         transform_at_scale(
-          signal,
+          centered_signal,
           wavelet_fn,
           scale,
           dt,
-          signal_length,
-          signal_norm
+          signal_length
         )
 
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(
-         signal,
-         wavelet_fn,
-         scale,
-         dt,
-         signal_length,
-         signal_norm
-       ) do
-    # Use scale-dependent window size
-    window_size = max(10, trunc(6 * scale))
+  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
+    # Window size scales with scale parameter
+    window_size = max(10, round(6 * scale))
 
-    # Scale factor includes signal normalization and wavelet admissibility condition
-    base_scale = :math.sqrt(dt / scale)
-    scale_factor = base_scale / signal_norm
+    # Scale dependent normalization
+    scale_factor = :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -58,33 +46,21 @@ defmodule Wavelets.CWT do
       end_idx = min(signal_length - 1, pos + window_size)
 
       # Compute wavelet coefficients
-      coeff =
+      {re, im} =
         start_idx..end_idx
-        |> Enum.reduce({0.0, 0.0}, fn i, acc ->
-          # Compute time point relative to current position
+        |> Enum.reduce({0.0, 0.0}, fn i, {acc_re, acc_im} ->
           t = (i - pos) * dt / scale
-
-          # Get wavelet value at this point
           {psi_re, psi_im} = wavelet_fn.(t)
-
-          # Get signal value
           signal_val = Enum.at(signal, i)
 
-          # Accumulate complex product
-          {re, im} = acc
-
           {
-            re + signal_val * psi_re,
-            im + signal_val * psi_im
+            acc_re + signal_val * psi_re,
+            acc_im + signal_val * psi_im
           }
         end)
 
-      # Apply proper scaling
-      scale_coefficient(coeff, scale_factor)
+      # Apply scale-dependent normalization
+      {re * scale_factor, im * scale_factor}
     end)
-  end
-
-  defp scale_coefficient({re, im}, scale_factor) do
-    {re * scale_factor, im * scale_factor}
   end
 end

@@ -1,6 +1,6 @@
 defmodule Wavelets.NDWT do
   @moduledoc """
-  Implementation of n-dimensional Discrete Wavelet Transform with dimension-appropriate scaling
+  Implementation of n-dimensional Discrete Wavelet Transform with consistent scaling
   """
 
   alias Wavelets.{DWT, Filter, IDWT}
@@ -16,22 +16,12 @@ defmodule Wavelets.NDWT do
       2 when is_list(hd(signal)) ->
         DWT.forward_2d(signal, filter, precision)
 
-      _ ->
-        # Adjust scaling for higher dimensions
-        {approx, details} = transform_nd(signal, filter, dims, precision)
-        scale = :math.pow(:math.sqrt(2), dims - 2)
-
-        {
-          scale_nd(approx, scale, dims),
-          scale_nd(details, scale, dims)
-        }
+      _ when dims > 2 ->
+        # Apply transform recursively for higher dimensions
+        signal
+        |> Enum.map(&forward(&1, filter, dims - 1, precision))
+        |> Enum.unzip()
     end
-  end
-
-  defp transform_nd(signal, filter, dims, precision) do
-    signal
-    |> Enum.map(&forward(&1, filter, dims - 1, precision))
-    |> Enum.unzip()
   end
 
   @doc """
@@ -46,36 +36,10 @@ defmodule Wavelets.NDWT do
       2 ->
         IDWT.inverse_2d(approximation, details, filter, precision)
 
-      _ ->
-        # Adjust scaling for inverse transform
-        scale = :math.pow(:math.sqrt(2), 2 - dims)
-        scaled_approx = scale_nd(approximation, scale, dims)
-        scaled_details = scale_nd(details, scale, dims)
-
-        inverse_transform_nd(
-          scaled_approx,
-          scaled_details,
-          filter,
-          dims,
-          precision
-        )
+      _ when dims > 2 ->
+        # Apply inverse transform recursively
+        Enum.zip(approximation, details)
+        |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
     end
   end
-
-  defp inverse_transform_nd(approximation, details, filter, dims, precision) do
-    Enum.zip(approximation, details)
-    |> Enum.map(fn {a, d} -> inverse(a, d, filter, dims - 1, precision) end)
-  end
-
-  defp scale_nd(data, scale, dims) when dims > 2 do
-    case data do
-      list when is_list(list) ->
-        Enum.map(list, &scale_nd(&1, scale, dims - 1))
-
-      value ->
-        value * scale
-    end
-  end
-
-  defp scale_nd(data, _scale, _dims), do: data
 end
