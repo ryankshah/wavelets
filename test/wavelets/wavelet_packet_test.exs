@@ -21,8 +21,8 @@ defmodule Wavelets.WaveletPacketTest do
     assert Map.has_key?(tree, {2, 2})
     assert Map.has_key?(tree, {2, 3})
 
-    # Verify root node contains original signal
-    assert_close(Map.get(tree, {0, 0}), signal)
+    # Check root node contains original signal
+    assert Map.get(tree, {0, 0}) == signal
   end
 
   test "perfectly reconstructs signal" do
@@ -33,12 +33,12 @@ defmodule Wavelets.WaveletPacketTest do
     tree = WaveletPacket.decompose_1d(signal, filter, levels)
     reconstructed = WaveletPacket.reconstruct_1d(tree, filter)
 
-    # Use a slightly larger tolerance for numerical stability
     assert_close(signal, reconstructed, 1.0e-8)
   end
 
   test "handles different wavelet filters" do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    original_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
     filters = [
       Filters.Daubechies.get(1),
@@ -51,18 +51,21 @@ defmodule Wavelets.WaveletPacketTest do
       reconstructed = WaveletPacket.reconstruct_1d(tree, filter)
       assert_close(signal, reconstructed, 1.0e-8)
 
-      # Also verify energy conservation
-      original_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+      # Check energy conservation at each level
+      levels = 0..2
 
-      tree_energy =
-        tree
-        |> Map.values()
-        |> Enum.map(&Enum.sum(Enum.map(&1, fn x -> x * x end)))
-        |> Enum.sum()
-        # Average over all nodes
-        |> Kernel./(Map.size(tree))
+      Enum.each(levels, fn level ->
+        level_coeffs =
+          for j <- 0..(trunc(:math.pow(2, level)) - 1),
+              coeffs = Map.get(tree, {level, j}),
+              coeffs != nil,
+              do:
+                coeffs
+                |> List.flatten()
 
-      assert_in_delta original_energy, tree_energy, 1.0e-8
+        level_energy = Enum.sum(Enum.map(level_coeffs, &(&1 * &1)))
+        assert_in_delta original_energy, level_energy, 1.0e-8
+      end)
     end)
   end
 end

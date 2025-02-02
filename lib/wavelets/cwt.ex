@@ -18,12 +18,28 @@ defmodule Wavelets.CWT do
 
     # Transform at each scale with proper normalization
     Enum.map(scales, fn scale ->
-      coeffs = transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, normalizing_factor)
+      coeffs =
+        transform_at_scale(
+          signal,
+          wavelet_fn,
+          scale,
+          dt,
+          signal_length,
+          normalizing_factor
+        )
+
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, normalizing_factor) do
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         normalizing_factor
+       ) do
     # Use scale-dependent window size for better localization
     window_size = max(10, trunc(6 * scale))
     scale_factor = :math.sqrt(dt / scale)
