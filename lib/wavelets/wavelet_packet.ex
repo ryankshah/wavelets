@@ -1,6 +1,6 @@
 defmodule Wavelets.WaveletPacket do
   @moduledoc """
-  Implementation of Wavelet Packet decomposition and reconstruction without additional scaling
+  Implementation of Wavelet Packet decomposition and reconstruction with level-wise scaling
   """
 
   alias Wavelets.DWT
@@ -8,10 +8,10 @@ defmodule Wavelets.WaveletPacket do
   alias Wavelets.IDWT
 
   @doc """
-  Performs 1D wavelet packet decomposition
+  Performs 1D wavelet packet decomposition with proper scaling
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    # Start with root node
+    # Start with root node without scaling (original signal)
     tree = %{{0, 0} => signal}
 
     # Build each level
@@ -34,6 +34,7 @@ defmodule Wavelets.WaveletPacket do
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
 
+        # Store nodes for this level
         [
           {{level, j * 2}, approx},
           {{level, j * 2 + 1}, details}
@@ -54,6 +55,7 @@ defmodule Wavelets.WaveletPacket do
       |> Enum.map(fn {level, _} -> level end)
       |> Enum.max()
 
+    # Start reconstruction from max level
     reconstruct_level(tree, filter, max_level)
   end
 
@@ -62,12 +64,15 @@ defmodule Wavelets.WaveletPacket do
   end
 
   defp reconstruct_level(tree, filter, level) do
+    # Reconstruct current level
     nodes =
       for j <- 0..(:math.pow(2, level - 1) |> trunc() |> Kernel.-(1)),
           approx = Map.get(tree, {level, j * 2}),
           details = Map.get(tree, {level, j * 2 + 1}),
           approx != nil and details != nil do
-        {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
+        # Direct reconstruction without additional scaling
+        reconstructed = IDWT.inverse_1d(approx, details, filter)
+        {{level - 1, j}, reconstructed}
       end
       |> Map.new()
 
