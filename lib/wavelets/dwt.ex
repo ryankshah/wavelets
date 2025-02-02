@@ -19,19 +19,18 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters with original Mallat normalization
+        # Apply filters with proper normalization for orthogonality
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
+          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
           |> Enum.sum()
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
-          |> Enum.map(fn {s, f} -> s * f end)
+          |> Enum.map(fn {s, f} -> s * f * :math.sqrt(2) end)
           |> Enum.sum()
 
-        # Orthonormal scaling
-        {approx * :math.sqrt(2), detail * :math.sqrt(2)}
+        {approx, detail}
       end)
       |> Enum.unzip()
 
@@ -42,10 +41,11 @@ defmodule Wavelets.DWT do
   Performs 2D forward discrete wavelet transform
   """
   def forward_2d(signal_2d, filter, precision \\ :double) do
-    # Apply rows then columns, letting the forward_1d handle scaling
+    # Apply rows
     row_transformed = Enum.map(signal_2d, &forward_1d(&1, filter, precision))
     {low_rows, high_rows} = Enum.unzip(row_transformed)
 
+    # Apply columns
     {approximation, vertical_details} =
       transpose(low_rows)
       |> Enum.map(&forward_1d(&1, filter, precision))

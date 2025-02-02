@@ -1,6 +1,6 @@
 defmodule Wavelets.Analysis do
   @moduledoc """
-  Tools for analyzing and visualizing wavelet transforms with corrected energy calculations
+  Tools for analyzing and visualizing wavelet transforms
   """
 
   @doc """
@@ -13,7 +13,7 @@ defmodule Wavelets.Analysis do
         coeffs
         |> List.flatten()
         |> compute_energy()
-        # Normalize by total number of coefficients
+        # Normalize by total coefficients
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
@@ -42,6 +42,8 @@ defmodule Wavelets.Analysis do
     signal
     |> Enum.map(&(&1 * &1))
     |> Enum.sum()
+    # Account for sqrt(2) normalization
+    |> Kernel.*(2)
   end
 
   defp normalize(values) do

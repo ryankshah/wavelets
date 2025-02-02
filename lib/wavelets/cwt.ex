@@ -1,6 +1,6 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with orthonormal scaling
+  Implementation of the Continuous Wavelet Transform
   """
 
   alias Wavelets.Utils.Complex
@@ -12,54 +12,72 @@ defmodule Wavelets.CWT do
     dt = 1.0
     signal_length = length(signal)
 
-    # Center signal and normalize by sqrt(dt) for orthonormality
+    # Calculate signal energy for normalization
+    signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+
+    # Center the signal and normalize
     signal_mean = Enum.sum(signal) / signal_length
-    centered_signal = Enum.map(signal, &((&1 - signal_mean) / :math.sqrt(dt)))
+    centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
     # Transform at each scale
-    Enum.map(scales, fn scale ->
+    scales
+    |> Enum.map(fn scale ->
       coeffs =
         transform_at_scale(
           centered_signal,
           wavelet_fn,
           scale,
           dt,
-          signal_length
+          signal_length,
+          signal_energy
         )
 
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Use scale-adaptive window size
-    window_size = max(10, min(signal_length - 1, trunc(6 * scale)))
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         signal_energy
+       ) do
+    # Adaptive window size based on scale
+    window_size = max(10, min(signal_length - 1, round(6.0 * scale)))
 
-    # Scale-dependent normalization following Mallat's convention
-    scale_factor = :math.sqrt(dt / scale)
+    # Normalization factor combining scale and energy
+    norm_factor = :math.sqrt(dt / (scale * signal_energy))
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
       start_idx = max(0, pos - window_size)
       end_idx = min(signal_length - 1, pos + window_size)
 
-      # Compute properly scaled wavelet coefficients
-      {re, im} =
+      coeff =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+          # Time point relative to center
           t = (i - pos) * dt / scale
+
+          # Get wavelet value
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # Accumulate with proper phase preservation
+          # Accumulate with normalizations
           {
-            re_acc + signal_val * psi_re * scale_factor,
-            im_acc + signal_val * psi_im * scale_factor
+            re_acc + signal_val * psi_re,
+            im_acc + signal_val * psi_im
           }
         end)
 
-      # Apply orthonormal scaling
-      {re * :math.sqrt(2), im * :math.sqrt(2)}
+      # Apply normalization
+      scale_coefficient(coeff, norm_factor)
     end)
+  end
+
+  defp scale_coefficient({re, im}, norm_factor) do
+    {re * norm_factor, im * norm_factor}
   end
 end

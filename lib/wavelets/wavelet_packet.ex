@@ -11,7 +11,7 @@ defmodule Wavelets.WaveletPacket do
   Performs 1D wavelet packet decomposition
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    # Store original signal without scaling
+    # Store signal without pre-scaling
     tree = %{{0, 0} => signal}
 
     # Build each level
@@ -29,7 +29,7 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Create new nodes with DWT (scaling handled in DWT)
+    # Create new nodes using DWT (which handles scaling internally)
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
