@@ -13,10 +13,14 @@ defmodule Wavelets.Filters.Daubechies do
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          decomposition_low_pass: [1, 1],  # Sum
-          decomposition_high_pass: [1, -1],  # Difference
-          reconstruction_low_pass: [0.5, 0.5],  # Average
-          reconstruction_high_pass: [0.5, -0.5],  # Half difference
+          # Sum
+          decomposition_low_pass: [1, 1],
+          # Difference
+          decomposition_high_pass: [1, -1],
+          # Average
+          reconstruction_low_pass: [0.5, 0.5],
+          # Half difference
+          reconstruction_high_pass: [0.5, -0.5],
           support_width: 2
         }
 

@@ -14,11 +14,13 @@ defmodule Wavelets.DWT do
       |> Enum.map(fn i ->
         j = 2 * i
         [a, b] = Enum.slice(signal, j..(j + 1))
-        
+
         # For Haar: approx should be average * 2, detail should be difference
-        approx = (a + b)  # Will be [8, 4] for [4,4,2,2]
-        detail = (a - b)  # Will be [0, 0] for [4,4,2,2]
-        
+        # Will be [8, 4] for [4,4,2,2]
+        approx = a + b
+        # Will be [0, 0] for [4,4,2,2]
+        detail = a - b
+
         {approx, detail}
       end)
       |> Enum.unzip()
