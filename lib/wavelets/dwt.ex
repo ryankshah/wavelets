@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  Implementation of the Discrete Wavelet Transform without additional scaling
+  Implementation of the Discrete Wavelet Transform with corrected normalization
   """
 
   alias Wavelets.Filter
@@ -11,6 +11,8 @@ defmodule Wavelets.DWT do
   def forward_1d(signal, filter, _precision \\ :double) do
     n = length(signal)
     half_n = div(n, 2)
+    # Normalization scale
+    scale = :math.sqrt(2)
 
     {approximation, details} =
       0..(half_n - 1)
@@ -20,16 +22,18 @@ defmodule Wavelets.DWT do
         window = Enum.slice(signal, j..min(j + 1, n - 1))
         window = if length(window) < 2, do: window ++ [0.0], else: window
 
-        # Apply filters without additional scaling
+        # Apply filters with normalization
         approx =
           Enum.zip(window, filter.decomposition_low_pass)
           |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
+          |> Kernel./(scale)
 
         detail =
           Enum.zip(window, filter.decomposition_high_pass)
           |> Enum.map(fn {s, f} -> s * f end)
           |> Enum.sum()
+          |> Kernel./(scale)
 
         {approx, detail}
       end)
@@ -42,6 +46,9 @@ defmodule Wavelets.DWT do
   Performs 2D forward discrete wavelet transform
   """
   def forward_2d(signal_2d, filter, precision \\ :double) do
+    # Additional scale for 2D
+    scale = :math.sqrt(2)
+
     # Apply rows
     row_transformed = Enum.map(signal_2d, &forward_1d(&1, filter, precision))
     {low_rows, high_rows} = Enum.unzip(row_transformed)
@@ -59,7 +66,19 @@ defmodule Wavelets.DWT do
       |> Enum.unzip()
       |> then(fn {h, d} -> {transpose(h), transpose(d)} end)
 
-    {approximation, {horizontal_details, vertical_details, diagonal_details}}
+    # Scale for 2D transform
+    scale_matrix = fn matrix ->
+      Enum.map(matrix, fn row -> Enum.map(row, &(&1 / scale)) end)
+    end
+
+    {
+      scale_matrix.(approximation),
+      {
+        scale_matrix.(horizontal_details),
+        scale_matrix.(vertical_details),
+        scale_matrix.(diagonal_details)
+      }
+    }
   end
 
   defp transpose(matrix) do
