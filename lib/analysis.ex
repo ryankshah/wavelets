@@ -10,16 +10,16 @@ defmodule Wavelets.Analysis do
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
+        total_length = length(List.flatten(coeffs))
+
         coeffs
         |> List.flatten()
         |> compute_energy()
-        # Normalize by total coefficients
-        |> Kernel./(length(List.flatten(coeffs)))
+        |> Kernel./(total_length)
 
       false ->
         coeffs
         |> compute_energy()
-        # Normalize by signal length
         |> Kernel./(length(coeffs))
     end
   end
@@ -42,8 +42,6 @@ defmodule Wavelets.Analysis do
     signal
     |> Enum.map(&(&1 * &1))
     |> Enum.sum()
-    # Account for sqrt(2) normalization
-    |> Kernel.*(2)
   end
 
   defp normalize(values) do

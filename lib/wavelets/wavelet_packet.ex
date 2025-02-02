@@ -11,10 +11,10 @@ defmodule Wavelets.WaveletPacket do
   Performs 1D wavelet packet decomposition
   """
   def decompose_1d(signal, filter, levels, _precision \\ :double) do
-    # Store signal without pre-scaling
+    # Initialize tree with original signal
     tree = %{{0, 0} => signal}
 
-    # Build each level
+    # Build tree level by level
     Enum.reduce(1..levels, tree, fn level, acc ->
       build_level(acc, filter, level)
     end)
@@ -23,13 +23,13 @@ defmodule Wavelets.WaveletPacket do
   defp build_level(tree, filter, level) do
     prev_level = level - 1
 
-    # Get nodes from previous level
+    # Get previous level nodes
     prev_nodes =
       for {key = {^prev_level, _}, signal} <- tree, into: %{} do
         {key, signal}
       end
 
-    # Create new nodes using DWT (which handles scaling internally)
+    # Create new nodes
     new_nodes =
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
@@ -54,6 +54,7 @@ defmodule Wavelets.WaveletPacket do
       |> Enum.map(fn {level, _} -> level end)
       |> Enum.max()
 
+    # Reconstruct from leaf nodes back to root
     reconstruct_level(tree, filter, max_level)
   end
 
@@ -67,7 +68,9 @@ defmodule Wavelets.WaveletPacket do
           approx = Map.get(tree, {level, j * 2}),
           details = Map.get(tree, {level, j * 2 + 1}),
           approx != nil and details != nil do
-        {{level - 1, j}, IDWT.inverse_1d(approx, details, filter)}
+        # Reconstruct signal for this node pair
+        reconstructed = IDWT.inverse_1d(approx, details, filter)
+        {{level - 1, j}, reconstructed}
       end
       |> Map.new()
 
