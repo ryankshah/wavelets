@@ -1,6 +1,6 @@
 defmodule Wavelets.Filters.Daubechies do
   @moduledoc """
-  Simple filter implementation focusing on correctness
+  Simplest possible filter implementation
   """
 
   alias Wavelets.Filter
@@ -8,15 +8,15 @@ defmodule Wavelets.Filters.Daubechies do
   def get(vanishing_moments) when vanishing_moments > 0 do
     case vanishing_moments do
       1 ->
-        # For Haar: just sum and difference
+        # Haar wavelet: just sum and difference
         %Filter{
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          # Sum
-          decomposition_low_pass: [1, 1],
-          # Difference
-          decomposition_high_pass: [1, -1],
+          # Plain sum
+          decomposition_low_pass: [1.0, 1.0],
+          # Plain difference
+          decomposition_high_pass: [1.0, -1.0],
           # Average
           reconstruction_low_pass: [0.5, 0.5],
           # Half difference
