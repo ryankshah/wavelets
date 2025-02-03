@@ -1,6 +1,6 @@
 defmodule Wavelets.Filters.Daubechies do
   @moduledoc """
-  Filter implementation with energy preservation
+  Filter implementation with consistent scaling
   """
 
   alias Wavelets.Filter
@@ -8,52 +8,47 @@ defmodule Wavelets.Filters.Daubechies do
   def get(vanishing_moments) when vanishing_moments > 0 do
     case vanishing_moments do
       1 ->
-        # Haar wavelet with energy preservation
-        # No additional scaling in filter
-        scale = 1.0
-
+        # Haar wavelet with consistent 0.5 scaling
         %Filter{
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          # Plain sum
-          decomposition_low_pass: [scale, scale],
-          # Plain difference
-          decomposition_high_pass: [scale, -scale],
-          # Quarter sum for reconstruction
-          reconstruction_low_pass: [0.25, 0.25],
-          # Quarter difference
-          reconstruction_high_pass: [0.25, -0.25],
+          # Half sum
+          decomposition_low_pass: [0.5, 0.5],
+          # Half difference
+          decomposition_high_pass: [0.5, -0.5],
+          # Same for reconstruction
+          reconstruction_low_pass: [0.5, 0.5],
+          reconstruction_high_pass: [0.5, -0.5],
           support_width: 2
         }
 
       2 ->
-        # Daubechies-4 with energy preservation
-        h0 = 1 + :math.sqrt(3)
-        h1 = 3 + :math.sqrt(3)
-        h2 = 3 - :math.sqrt(3)
-        h3 = 1 - :math.sqrt(3)
-        # Normalization for energy
-        norm = 8 * :math.sqrt(2)
+        # Normalized Daubechies-4
+        h = [
+          1 + :math.sqrt(3),
+          3 + :math.sqrt(3),
+          3 - :math.sqrt(3),
+          1 - :math.sqrt(3)
+        ]
 
-        decomp = [h0 / norm, h1 / norm, h2 / norm, h3 / norm]
-        # Scale down reconstruction filters
-        recon = Enum.map(decomp, &(&1 / 4))
+        # Basic normalization
+        norm = 8.0
+
+        coeffs = Enum.map(h, &(&1 / norm))
 
         %Filter{
           name: "db2",
           family: :daubechies,
           vanishing_moments: 2,
-          decomposition_low_pass: decomp,
-          decomposition_high_pass: [
-            -h3 / norm,
-            h2 / norm,
-            -h1 / norm,
-            h0 / norm
-          ],
-          reconstruction_low_pass: recon,
+          decomposition_low_pass: coeffs,
+          decomposition_high_pass:
+            Enum.zip(coeffs |> Enum.reverse(), [1, -1, 1, -1])
+            |> Enum.map(fn {c, s} -> c * s end),
+          reconstruction_low_pass: coeffs,
           reconstruction_high_pass:
-            Enum.map([-h3 / norm, h2 / norm, -h1 / norm, h0 / norm], &(&1 / 4)),
+            Enum.zip(coeffs |> Enum.reverse(), [1, -1, 1, -1])
+            |> Enum.map(fn {c, s} -> c * s end),
           support_width: 4
         }
     end
