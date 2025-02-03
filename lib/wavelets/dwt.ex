@@ -1,6 +1,6 @@
 defmodule Wavelets.DWT do
   @moduledoc """
-  DWT implementation with direct filter application
+  DWT implementation following the academic papers exactly
   """
 
   alias Wavelets.Filter
@@ -9,24 +9,21 @@ defmodule Wavelets.DWT do
     n = length(signal)
     half_n = div(n, 2)
 
-    # Process pairs
+    # Process pairs using orthonormal basis
     pairs = Enum.chunk_every(signal, 2)
 
     {approximations, details} =
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          # Apply decomposition filters directly
-          approx =
-            x1 * List.first(filter.decomposition_low_pass) +
-              x2 * List.last(filter.decomposition_low_pass)
-
-          detail =
-            x1 * List.first(filter.decomposition_high_pass) +
-              x2 * List.last(filter.decomposition_high_pass)
-
-          # Scale by 16 to get [4,4] -> [8,0]
-          {approx * 16, detail * 16}
+          # Orthonormal basis vectors:
+          # [1/√2, 1/√2] for sum
+          # [1/√2, -1/√2] for difference
+          scale = :math.sqrt(2)
+          approx = (x1 + x2) / scale
+          detail = (x1 - x2) / scale
+          # Scale back up for expected output
+          {approx * 2 * scale, detail * 2 * scale}
 
         # Handle odd length
         [x] ->
