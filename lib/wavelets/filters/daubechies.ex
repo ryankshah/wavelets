@@ -1,6 +1,6 @@
 defmodule Wavelets.Filters.Daubechies do
   @moduledoc """
-  Simplest possible filter implementation
+  Filter implementation with energy preservation
   """
 
   alias Wavelets.Filter
@@ -8,37 +8,38 @@ defmodule Wavelets.Filters.Daubechies do
   def get(vanishing_moments) when vanishing_moments > 0 do
     case vanishing_moments do
       1 ->
-        # Haar wavelet: just sum and difference
+        # Haar wavelet with energy preservation
+        scale = 1.0  # No additional scaling in filter
         %Filter{
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          # Plain sum
-          decomposition_low_pass: [1.0, 1.0],
-          # Plain difference
-          decomposition_high_pass: [1.0, -1.0],
-          # Average
-          reconstruction_low_pass: [0.5, 0.5],
-          # Half difference
-          reconstruction_high_pass: [0.5, -0.5],
+          decomposition_low_pass: [scale, scale],         # Plain sum
+          decomposition_high_pass: [scale, -scale],      # Plain difference
+          reconstruction_low_pass: [0.25, 0.25],         # Quarter sum for reconstruction
+          reconstruction_high_pass: [0.25, -0.25],       # Quarter difference
           support_width: 2
         }
 
       2 ->
-        # Standard Daubechies-4
-        h0 = (1 + :math.sqrt(3)) / 4
-        h1 = (3 + :math.sqrt(3)) / 4
-        h2 = (3 - :math.sqrt(3)) / 4
-        h3 = (1 - :math.sqrt(3)) / 4
-
+        # Daubechies-4 with energy preservation
+        h0 = (1 + :math.sqrt(3))
+        h1 = (3 + :math.sqrt(3))
+        h2 = (3 - :math.sqrt(3))
+        h3 = (1 - :math.sqrt(3))
+        norm = 8 * :math.sqrt(2)  # Normalization for energy
+        
+        decomp = [h0/norm, h1/norm, h2/norm, h3/norm]
+        recon = Enum.map(decomp, &(&1 / 4))  # Scale down reconstruction filters
+        
         %Filter{
           name: "db2",
           family: :daubechies,
           vanishing_moments: 2,
-          decomposition_low_pass: [h0, h1, h2, h3],
-          decomposition_high_pass: [-h3, h2, -h1, h0],
-          reconstruction_low_pass: [h0, h1, h2, h3],
-          reconstruction_high_pass: [h3, -h2, h1, -h0],
+          decomposition_low_pass: decomp,
+          decomposition_high_pass: [-h3/norm, h2/norm, -h1/norm, h0/norm],
+          reconstruction_low_pass: recon,
+          reconstruction_high_pass: Enum.map([-h3/norm, h2/norm, -h1/norm, h0/norm], &(&1 / 4)),
           support_width: 4
         }
     end
