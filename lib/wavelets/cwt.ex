@@ -37,24 +37,18 @@ defmodule Wavelets.CWT do
     end)
   end
 
-  defp transform_at_scale(
-         signal,
-         wavelet_fn,
-         scale,
-         dt,
-         signal_length,
-         _energy_factor
-       ) do
-    # Doubled window size
+  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, _energy_factor) do
     window_size = min(signal_length - 1, max(10, round(8 * scale)))
-
-    # Scale factor includes dt for energy preservation
-    scale_factor = dt / :math.sqrt(scale)
+    
+    # PyWavelets uses this normalization for CWT
+    scale_factor = :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
-      start_idx = max(0, pos - window_size)
-      end_idx = min(signal_length - 1, pos + window_size)
+      # Center-aligned window with proper size
+      half_window = div(window_size, 2)
+      start_idx = max(0, pos - half_window)
+      end_idx = min(signal_length - 1, pos + half_window)
 
       {re, im} =
         start_idx..end_idx
@@ -64,12 +58,12 @@ defmodule Wavelets.CWT do
           signal_val = Enum.at(signal, i)
 
           {
-            re_acc + signal_val * psi_re,
-            im_acc + signal_val * psi_im
+            re_acc + signal_val * psi_re * scale_factor,
+            im_acc + signal_val * psi_im * scale_factor
           }
         end)
 
-      {re * scale_factor, im * scale_factor}
+      {re, im}
     end)
   end
 

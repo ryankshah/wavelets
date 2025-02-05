@@ -16,9 +16,10 @@ defmodule Wavelets.Analysis do
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
+        # For wavelet coefficients, use same normalization as PyWavelets
         coeffs
         |> compute_energy()
-        |> Kernel./(length(coeffs))
+        |> Kernel./(:math.pow(2, length(coeffs)))
     end
   end
 
