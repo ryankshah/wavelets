@@ -8,22 +8,23 @@ defmodule Wavelets.IDWT do
   @doc """
   Performs 1D inverse discrete wavelet transform
   """
-  def inverse_1d(approximation, details, filter, _precision \\ :double) do
+  def inverse_1d(approximation, details, _filter, _precision \\ :double) do
     n = length(approximation)
+    scale = :math.sqrt(2)
 
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
 
-      # Get coefficients - scale both by 1/2 for reconstruction
-      a = Enum.at(approximation, pos, 0.0) / 2
-      d = Enum.at(details, pos, 0.0) / 2
+      # Match PyWavelets reconstruction
+      a = Enum.at(approximation, pos, 0.0) * scale
+      d = Enum.at(details, pos, 0.0) * scale
 
-      r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
-      r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
-
-      # Apply reconstruction filters
-      (a * r_low + d * r_high) * 2
+      if rem(i, 2) == 0 do
+        (a + d) / 2
+      else
+        (a - d) / 2
+      end
     end)
   end
 

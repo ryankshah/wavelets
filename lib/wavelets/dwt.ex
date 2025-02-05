@@ -5,23 +5,22 @@ defmodule Wavelets.DWT do
 
   alias Wavelets.Filter
 
-  def forward_1d(signal, filter, _precision \\ :double) do
+  def forward_1d(signal, _filter, _precision \\ :double) do
     pairs = Enum.chunk_every(signal, 2)
+    scale = :math.sqrt(2)
 
-    # No scaling in forward transform
     {approximations, details} =
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          # Average
-          approx = x1 + x2
-          # Difference
-          detail = x1 - x2
+          # Exactly match PyWavelets scaling
+          approx = (x1 + x2) / scale
+          detail = (x1 - x2) / scale
           {approx, detail}
 
-        # Handle odd-length signals
+        # Match scaling for odd length
         [x] ->
-          {x, 0.0}
+          {x / scale, 0.0}
       end)
       |> Enum.unzip()
 

@@ -10,14 +10,12 @@ defmodule Wavelets.Analysis do
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
-        # For 2D signals
         coeffs
         |> List.flatten()
         |> compute_energy()
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # For 1D signals, normalize by signal length
         coeffs
         |> compute_energy()
         |> Kernel./(length(coeffs))

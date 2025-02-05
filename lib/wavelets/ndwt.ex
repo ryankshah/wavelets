@@ -9,6 +9,7 @@ defmodule Wavelets.NDWT do
   Performs n-dimensional forward discrete wavelet transform
   """
   def forward(signal, filter, dims, precision \\ :double) when dims > 0 do
+    # Simple recursive application of 1D transform
     case dims do
       1 when is_list(signal) ->
         DWT.forward_1d(signal, filter, precision)
@@ -17,15 +18,9 @@ defmodule Wavelets.NDWT do
         DWT.forward_2d(signal, filter, precision)
 
       _ when dims > 2 ->
-        # Scale by 2 for each additional dimension
-        scale = :math.pow(2, dims - 2)
-
-        {approx, details} =
-          signal
-          |> Enum.map(&forward(&1, filter, dims - 1, precision))
-          |> Enum.unzip()
-
-        {scale_signal(approx, scale), scale_signal(details, scale)}
+        signal
+        |> Enum.map(&forward(&1, filter, dims - 1, precision))
+        |> Enum.unzip()
     end
   end
 

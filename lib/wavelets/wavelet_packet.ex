@@ -28,17 +28,14 @@ defmodule Wavelets.WaveletPacket do
         {key, signal}
       end
 
-    # Scale by 2 at each level
-    scale = :math.pow(2, level - 1)
-
     new_nodes =
       prev_nodes
       |> Enum.flat_map(fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter, precision)
 
         [
-          {{level, j * 2}, approx |> Enum.map(&(&1 * scale))},
-          {{level, j * 2 + 1}, details |> Enum.map(&(&1 * scale))}
+          {{level, j * 2}, approx},
+          {{level, j * 2 + 1}, details}
         ]
       end)
       |> Map.new()
@@ -64,17 +61,23 @@ defmodule Wavelets.WaveletPacket do
   end
 
   defp reconstruct_level(tree, filter, level, precision) do
-    nodes =
-      for j <- 0..(:math.pow(2, level - 1) |> trunc() |> Kernel.-(1)),
-          approx = Map.get(tree, {level, j * 2}),
-          details = Map.get(tree, {level, j * 2 + 1}),
-          approx != nil and details != nil do
-        reconstructed = IDWT.inverse_1d(approx, details, filter, precision)
-        {{level - 1, j}, reconstructed}
-      end
-      |> Map.new()
+    case level do
+      0 ->
+        Map.get(tree, {0, 0})
 
-    Map.merge(tree, nodes)
-    |> reconstruct_level(filter, level - 1, precision)
+      _ ->
+        nodes =
+          for j <- 0..(:math.pow(2, level - 1) |> trunc() |> Kernel.-(1)),
+              approx = Map.get(tree, {level, j * 2}),
+              details = Map.get(tree, {level, j * 2 + 1}),
+              approx != nil and details != nil do
+            reconstructed = IDWT.inverse_1d(approx, details, filter, precision)
+            {{level - 1, j}, reconstructed}
+          end
+          |> Map.new()
+
+        Map.merge(tree, nodes)
+        |> reconstruct_level(filter, level - 1, precision)
+    end
   end
 end
