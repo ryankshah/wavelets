@@ -31,7 +31,12 @@ defmodule Wavelets.IDWT do
   @doc """
   Performs 2D inverse discrete wavelet transform
   """
-  def inverse_2d(approximation, {h_details, v_details, d_details}, filter, precision \\ :double) do
+  def inverse_2d(
+        approximation,
+        {h_details, v_details, d_details},
+        filter,
+        precision \\ :double
+      ) do
     # Column transforms
     rows_low =
       transpose(approximation)

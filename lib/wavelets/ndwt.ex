@@ -21,7 +21,7 @@ defmodule Wavelets.NDWT do
           signal
           |> Enum.map(&forward(&1, filter, dims - 1, precision))
           |> Enum.unzip()
-          
+
         # No extra scaling needed for higher dimensions
         {approx, details}
     end
@@ -47,11 +47,15 @@ defmodule Wavelets.NDWT do
   def inverse(approximation, details, filter, dims, precision \\ :double)
       when dims > 0 do
     case dims do
-      1 -> IDWT.inverse_1d(approximation, details, filter, precision)
-      2 -> IDWT.inverse_2d(approximation, details, filter, precision)
+      1 ->
+        IDWT.inverse_1d(approximation, details, filter, precision)
+
+      2 ->
+        IDWT.inverse_2d(approximation, details, filter, precision)
+
       _ when dims > 2 ->
         Enum.zip(approximation, details)
-        |> Enum.map(fn {a, d} -> 
+        |> Enum.map(fn {a, d} ->
           inverse(a, d, filter, dims - 1, precision)
         end)
     end
