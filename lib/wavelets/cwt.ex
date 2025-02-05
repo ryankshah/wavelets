@@ -37,11 +37,18 @@ defmodule Wavelets.CWT do
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, _energy_factor) do
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         _energy_factor
+       ) do
     # PyWavelets uses this window size calculation
     width = 10 * scale
     window_size = min(signal_length - 1, round(width))
-    
+
     # PyWavelets normalization
     scale_factor = :math.sqrt(1 / scale)
 

@@ -18,7 +18,9 @@ defmodule Wavelets.DWT do
           detail = (x1 - x2) / scale
           {approx, detail}
 
-        [x] -> {x, 0.0}  # For odd length, keep original value
+        # For odd length, keep original value
+        [x] ->
+          {x, 0.0}
       end)
       |> Enum.unzip()
 
