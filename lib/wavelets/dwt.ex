@@ -7,23 +7,24 @@ defmodule Wavelets.DWT do
 
   def forward_1d(signal, filter, _precision \\ :double) do
     n = length(signal)
-    half_n = div(n, 2)
 
-    # Process pairs using orthonormal basis
+    # Process pairs using proper Haar normalization
     pairs = Enum.chunk_every(signal, 2)
 
     {approximations, details} =
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          # Use √2 scaling to maintain energy
-          approx = (x1 + x2) / :math.sqrt(2)
-          detail = (x1 - x2) / :math.sqrt(2)
+          # For Haar wavelets, maintain expected scaling
+          # No scaling for approximation coefficients
+          approx = x1 + x2
+          # Half difference for detail coefficients
+          detail = (x1 - x2) / 2
           {approx, detail}
 
-        # Handle odd length with proper scaling
         [x] ->
-          {x / :math.sqrt(2), 0.0}
+          # Keep single values unchanged
+          {x, 0.0}
       end)
       |> Enum.unzip()
 

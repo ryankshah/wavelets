@@ -20,7 +20,8 @@ defmodule Wavelets.Analysis do
       false ->
         coeffs
         |> compute_energy()
-        |> Kernel./(length(coeffs))
+        # Divide by 2*N for proper normalization
+        |> Kernel./(2 * length(coeffs))
     end
   end
 
