@@ -15,7 +15,7 @@ defmodule Wavelets.SWT do
           Wavelets.precision()
         ) ::
           {list(list(number)), list(list(number))}
-  def transform_1d(signal, filter, levels, _precision \\ :double) do
+  def transform_1d(signal, filter, levels, precision \\ :double) do
     do_transform_1d(signal, filter, levels, [], [])
   end
 
@@ -37,13 +37,19 @@ defmodule Wavelets.SWT do
   end
 
   defp undecimated_decomposition(signal, filter) do
-    # Extend signal by periodic padding to maintain length
     n = length(signal)
     padded = extend_periodic(signal, n)
 
-    # Apply filters without downsampling
-    approx = convolve_periodic(padded, filter.decomposition_low_pass, n)
-    details = convolve_periodic(padded, filter.decomposition_high_pass, n)
+    # Apply filters with proper scaling (√2 for orthonormality)
+    scale = :math.sqrt(2)
+
+    approx =
+      convolve_periodic(padded, filter.decomposition_low_pass, n)
+      |> Enum.map(&(&1 / scale))
+
+    details =
+      convolve_periodic(padded, filter.decomposition_high_pass, n)
+      |> Enum.map(&(&1 / scale))
 
     {approx, details}
   end
@@ -58,7 +64,6 @@ defmodule Wavelets.SWT do
       filter
       |> Enum.with_index()
       |> Enum.map(fn {f, k} ->
-        # Use periodic indexing
         idx = rem(i + k, output_length)
         Enum.at(signal, idx) * f
       end)

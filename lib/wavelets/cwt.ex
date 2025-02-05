@@ -43,17 +43,17 @@ defmodule Wavelets.CWT do
          scale,
          dt,
          signal_length,
-         energy_factor
+         _energy_factor
        ) do
-    # Window size based on scale
+    # Window size proportional to scale
     window_size = min(signal_length - 1, max(10, round(4 * scale)))
 
-    # Updated scaling to preserve energy
-    scale_factor = 1.0 / scale
+    # Scale factor for energy preservation
+    scale_factor = 1.0 / :math.sqrt(scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
-      # Center the computation window
+      # Center-aligned window
       start_idx = max(0, pos - window_size)
       end_idx = min(signal_length - 1, pos + window_size)
 
@@ -70,8 +70,8 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      # Apply energy-preserving normalization
-      {re * scale_factor * dt, im * scale_factor * dt}
+      # Apply scale-dependent normalization
+      {re * scale_factor, im * scale_factor}
     end)
   end
 

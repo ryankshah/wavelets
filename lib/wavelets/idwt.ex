@@ -10,21 +10,22 @@ defmodule Wavelets.IDWT do
   """
   def inverse_1d(approximation, details, filter, _precision \\ :double) do
     n = length(approximation)
+    scale = :math.sqrt(2)
 
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
-      # Get coefficients without extra scaling
-      a = Enum.at(approximation, pos, 0.0)
-      # Restore detail coefficient scaling
-      d = Enum.at(details, pos, 0.0) * 2
+
+      # Get coefficients and apply reconstruction scaling
+      a = Enum.at(approximation, pos, 0.0) * scale
+      d = Enum.at(details, pos, 0.0) * scale
 
       # Apply reconstruction filters
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      # Reconstruction without additional scaling
-      a * r_low + d * r_high
+      # Final reconstruction
+      (a * r_low + d * r_high) / 2
     end)
   end
 
@@ -37,26 +38,16 @@ defmodule Wavelets.IDWT do
         filter,
         precision \\ :double
       ) do
-    # Add scaling factor for 2D reconstruction
-    scale = 2.0
-
-    scaled_approx =
-      Enum.map(approximation, fn row -> Enum.map(row, &(&1 * scale)) end)
-
-    scaled_h = Enum.map(h_details, fn row -> Enum.map(row, &(&1 * scale)) end)
-    scaled_v = Enum.map(v_details, fn row -> Enum.map(row, &(&1 * scale)) end)
-    scaled_d = Enum.map(d_details, fn row -> Enum.map(row, &(&1 * scale)) end)
-
-    # Use scaled coefficients
+    # Inverse transform on columns
     rows_low =
-      transpose(scaled_approx)
-      |> Enum.zip(transpose(scaled_v))
+      transpose(approximation)
+      |> Enum.zip(transpose(v_details))
       |> Enum.map(fn {a, d} -> inverse_1d(a, d, filter, precision) end)
       |> transpose()
 
     rows_high =
-      transpose(scaled_h)
-      |> Enum.zip(transpose(scaled_d))
+      transpose(h_details)
+      |> Enum.zip(transpose(d_details))
       |> Enum.map(fn {h, d} -> inverse_1d(h, d, filter, precision) end)
       |> transpose()
 
@@ -65,7 +56,5 @@ defmodule Wavelets.IDWT do
     |> Enum.map(fn {l, h} -> inverse_1d(l, h, filter, precision) end)
   end
 
-  defp transpose(matrix) do
-    matrix |> Enum.zip() |> Enum.map(&Tuple.to_list/1)
-  end
+  defp transpose(matrix), do: matrix |> Enum.zip() |> Enum.map(&Tuple.to_list/1)
 end
