@@ -21,7 +21,7 @@ defmodule Wavelets.WaveletPacketTest do
     assert Map.has_key?(tree, {2, 2})
     assert Map.has_key?(tree, {2, 3})
 
-    # Check root node contains original signal
+    # Root node should contain original signal
     assert Map.get(tree, {0, 0}) == signal
   end
 
@@ -52,18 +52,13 @@ defmodule Wavelets.WaveletPacketTest do
       assert_close(signal, reconstructed, 1.0e-8)
 
       # Check energy conservation at each level
-      levels = 0..2
-
-      Enum.each(levels, fn level ->
-        level_coeffs =
-          for j <- 0..(trunc(:math.pow(2, level)) - 1),
-              coeffs = Map.get(tree, {level, j}),
-              coeffs != nil,
-              do:
-                coeffs
-                |> List.flatten()
-
-        level_energy = Enum.sum(Enum.map(level_coeffs, &(&1 * &1)))
+      Enum.each(0..2, fn level ->
+        level_coeffs = for j <- 0..(trunc(:math.pow(2, level)) - 1),
+                          coeffs = Map.get(tree, {level, j}),
+                          coeffs != nil,
+                          do: coeffs |> List.flatten()
+        
+        level_energy = level_coeffs |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
         assert_in_delta original_energy, level_energy, 1.0e-8
       end)
     end)
