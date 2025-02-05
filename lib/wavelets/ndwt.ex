@@ -17,14 +17,26 @@ defmodule Wavelets.NDWT do
         DWT.forward_2d(signal, filter, precision)
 
       _ when dims > 2 ->
-        # Transform recursively through dimensions
+        # Scale by 2 for each additional dimension
+        scale = :math.pow(2, dims - 2)
         {approx, details} =
           signal
           |> Enum.map(&forward(&1, filter, dims - 1, precision))
           |> Enum.unzip()
 
-        {approx, details}
+        {scale_signal(approx, scale), scale_signal(details, scale)}
     end
+  end
+
+  defp scale_signal(data, scale) when is_number(data), do: data * scale
+  defp scale_signal(data, scale) when is_list(data) do
+    Enum.map(data, &scale_signal(&1, scale))
+  end
+  defp scale_signal({a, b}, scale) do
+    {scale_signal(a, scale), scale_signal(b, scale)}
+  end
+  defp scale_signal({a, b, c}, scale) do
+    {scale_signal(a, scale), scale_signal(b, scale), scale_signal(c, scale)}
   end
 
   @doc """
