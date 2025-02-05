@@ -16,18 +16,14 @@ defmodule Wavelets.DWT do
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          # Orthonormal basis vectors:
-          # [1/√2, 1/√2] for sum
-          # [1/√2, -1/√2] for difference
-          scale = :math.sqrt(2)
-          approx = (x1 + x2) / scale
-          detail = (x1 - x2) / scale
-          # Scale back up for expected output
-          {approx * 2 * scale, detail * 2 * scale}
+          # Use √2 scaling to maintain energy
+          approx = (x1 + x2) / :math.sqrt(2)
+          detail = (x1 - x2) / :math.sqrt(2)
+          {approx, detail}
 
-        # Handle odd length
+        # Handle odd length with proper scaling
         [x] ->
-          {x, 0.0}
+          {x / :math.sqrt(2), 0.0}
       end)
       |> Enum.unzip()
 

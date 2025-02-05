@@ -14,17 +14,16 @@ defmodule Wavelets.IDWT do
     0..(2 * n - 1)
     |> Enum.map(fn i ->
       pos = div(i, 2)
-      # Get coefficients
-      a = Enum.at(approximation, pos, 0.0)
-      d = Enum.at(details, pos, 0.0)
+      # Get coefficients with proper scaling
+      a = Enum.at(approximation, pos, 0.0) * :math.sqrt(2)
+      d = Enum.at(details, pos, 0.0) * :math.sqrt(2)
 
-      # Apply reconstruction filters (already include x2 scaling)
+      # Apply reconstruction filters
       r_low = Enum.at(filter.reconstruction_low_pass, rem(i, 2))
       r_high = Enum.at(filter.reconstruction_high_pass, rem(i, 2))
 
-      # No additional scaling needed
-      # Divide by 4 to compensate for both transforms
-      (a * r_low + d * r_high) / 4.0
+      # No additional scaling needed since inputs are pre-scaled
+      (a * r_low + d * r_high) / 2.0
     end)
   end
 

@@ -34,10 +34,10 @@ defmodule Wavelets.WaveletPacket do
       Enum.flat_map(Map.to_list(prev_nodes), fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter)
 
-        # Scale appropriately for level
-        scale = :math.pow(0.5, level - 1)
-        scaled_approx = Enum.map(approx, &(&1 * scale))
-        scaled_details = Enum.map(details, &(&1 * scale))
+        # Scale using √2 for energy preservation
+        scale = :math.sqrt(:math.pow(2, level - 1))
+        scaled_approx = Enum.map(approx, &(&1 / scale))
+        scaled_details = Enum.map(details, &(&1 / scale))
 
         [
           {{level, j * 2}, scaled_approx},

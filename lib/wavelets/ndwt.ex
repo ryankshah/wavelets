@@ -57,18 +57,15 @@ defmodule Wavelets.NDWT do
   end
 
   # Recursive scaling functions handling all data types
-  defp scale_recursive(data, scale) when is_number(data), do: data * scale
+  defp scale_recursive(data, scale) when is_number(data),
+    do: data * :math.sqrt(scale)
 
   defp scale_recursive(data, scale) when is_list(data) do
-    Enum.map(data, &scale_recursive(&1, scale))
+    Enum.map(data, &scale_recursive(&1, :math.sqrt(scale)))
   end
 
   defp scale_recursive({a, b, c}, scale) do
     {scale_recursive(a, scale), scale_recursive(b, scale),
      scale_recursive(c, scale)}
-  end
-
-  defp scale_recursive({a, b}, scale) do
-    {scale_recursive(a, scale), scale_recursive(b, scale)}
   end
 end

@@ -48,8 +48,8 @@ defmodule Wavelets.CWT do
     # Improved window size calculation
     window_size = min(signal_length - 1, max(10, round(4 * scale)))
 
-    # Scale factor includes energy normalization
-    scale_factor = :math.sqrt(dt / scale) / energy_factor
+    # Scale factor includes proper energy normalization
+    scale_factor = 1.0 / (:math.sqrt(scale) * energy_factor)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
