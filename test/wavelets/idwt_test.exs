@@ -46,13 +46,16 @@ defmodule Wavelets.IDWTTest do
     assert_close_2d(original, reconstructed, 1.0e-8)
 
     # Verify energy conservation for 2D transform
-    original_energy = original |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
-    transform_energy = (
-      List.flatten(approx) ++
-      List.flatten(elem(details, 0)) ++
-      List.flatten(elem(details, 1)) ++
-      List.flatten(elem(details, 2))
-    ) |> Enum.map(&(&1 * &1)) |> Enum.sum()
+    original_energy =
+      original |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+
+    transform_energy =
+      (List.flatten(approx) ++
+         List.flatten(elem(details, 0)) ++
+         List.flatten(elem(details, 1)) ++
+         List.flatten(elem(details, 2)))
+      |> Enum.map(&(&1 * &1))
+      |> Enum.sum()
 
     assert_in_delta original_energy, transform_energy, 1.0e-8
   end

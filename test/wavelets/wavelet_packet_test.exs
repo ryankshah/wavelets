@@ -53,12 +53,15 @@ defmodule Wavelets.WaveletPacketTest do
 
       # Check energy conservation at each level
       Enum.each(0..2, fn level ->
-        level_coeffs = for j <- 0..(trunc(:math.pow(2, level)) - 1),
-                          coeffs = Map.get(tree, {level, j}),
-                          coeffs != nil,
-                          do: coeffs |> List.flatten()
-        
-        level_energy = level_coeffs |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+        level_coeffs =
+          for j <- 0..(trunc(:math.pow(2, level)) - 1),
+              coeffs = Map.get(tree, {level, j}),
+              coeffs != nil,
+              do: coeffs |> List.flatten()
+
+        level_energy =
+          level_coeffs |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+
         assert_in_delta original_energy, level_energy, 1.0e-8
       end)
     end)

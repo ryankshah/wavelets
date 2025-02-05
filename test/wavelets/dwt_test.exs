@@ -21,14 +21,14 @@ defmodule Wavelets.DWTTest do
   test "preserves energy" do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     filter = Filters.Daubechies.get(2)
-    
+
     {approx, details} = DWT.forward_1d(signal, filter)
 
     original_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-    transform_energy = (
+
+    transform_energy =
       Enum.sum(Enum.map(approx, &(&1 * &1))) +
-      Enum.sum(Enum.map(details, &(&1 * &1)))
-    )
+        Enum.sum(Enum.map(details, &(&1 * &1)))
 
     # Energy should be exactly preserved
     assert_in_delta original_energy, transform_energy, 1.0e-8

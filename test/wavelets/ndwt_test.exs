@@ -17,10 +17,14 @@ defmodule Wavelets.NDWTTest do
     |> Enum.each(fn {orig, recon} -> assert_close_2d(orig, recon, 1.0e-8) end)
 
     # Verify energy conservation
-    original_energy = signal |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
-    transform_energy = (List.flatten(approx) ++ List.flatten(details))
-                      |> Enum.map(&(&1 * &1))
-                      |> Enum.sum()
+    original_energy =
+      signal |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+
+    transform_energy =
+      (List.flatten(approx) ++ List.flatten(details))
+      |> Enum.map(&(&1 * &1))
+      |> Enum.sum()
+
     assert_in_delta original_energy, transform_energy, 1.0e-8
   end
 
