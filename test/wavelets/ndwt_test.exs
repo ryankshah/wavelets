@@ -33,16 +33,12 @@ defmodule Wavelets.NDWTTest do
             do: val * val
       )
 
-    # Details is a tuple of lists, need to handle separately
+    # Handle tuple details separately and clearly
     {d1, d2, d3} = details
-
-    details_energy =
-      for(s <- d1, row <- s, val <- row, do: val * val)
-      |> (Enum.sum() +
-            for(s <- d2, row <- s, val <- row, do: val * val))
-      |> (Enum.sum() +
-            for(s <- d3, row <- s, val <- row, do: val * val))
-      |> Enum.sum()
+    d1_energy = Enum.sum(for s <- d1, row <- s, val <- row, do: val * val)
+    d2_energy = Enum.sum(for s <- d2, row <- s, val <- row, do: val * val)
+    d3_energy = Enum.sum(for s <- d3, row <- s, val <- row, do: val * val)
+    details_energy = d1_energy + d2_energy + d3_energy
 
     transform_energy = approx_energy + details_energy
     assert_in_delta original_energy, transform_energy, 1.0e-8
