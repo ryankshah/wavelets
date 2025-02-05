@@ -16,7 +16,7 @@ defmodule Wavelets.NDWTTest do
     Enum.zip(signal, reconstructed)
     |> Enum.each(fn {orig, recon} -> assert_close_2d(orig, recon, 1.0e-8) end)
 
-    # Calculate energies - handle nested structure properly
+    # Calculate energies with proper structure handling
     original_energy =
       Enum.sum(
         for s <- signal,
@@ -33,12 +33,16 @@ defmodule Wavelets.NDWTTest do
             do: val * val
       )
 
-    # Handle tuple details separately and clearly
-    {d1, d2, d3} = details
-    d1_energy = Enum.sum(for s <- d1, row <- s, val <- row, do: val * val)
-    d2_energy = Enum.sum(for s <- d2, row <- s, val <- row, do: val * val)
-    d3_energy = Enum.sum(for s <- d3, row <- s, val <- row, do: val * val)
-    details_energy = d1_energy + d2_energy + d3_energy
+    # Handle list of tuples structure
+    details_energy =
+      Enum.sum(
+        for detail_tuple <- details,
+            {d1, d2, d3} = detail_tuple,
+            d <- [d1, d2, d3],
+            row <- d,
+            val <- row,
+            do: val * val
+      )
 
     transform_energy = approx_energy + details_energy
     assert_in_delta original_energy, transform_energy, 1.0e-8

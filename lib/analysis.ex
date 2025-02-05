@@ -10,16 +10,16 @@ defmodule Wavelets.Analysis do
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
-        # 2D signals: normalize by total size
         coeffs
         |> List.flatten()
         |> compute_energy()
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # 1D signals: normalize by signal length
-        total_energy = compute_energy(coeffs)
-        total_energy / length(coeffs)
+        # PyWavelets actually uses a different normalization for wavelets
+        # They preserve total energy rather than energy density
+        coeffs
+        |> compute_energy()
     end
   end
 
