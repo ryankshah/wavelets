@@ -16,13 +16,29 @@ defmodule Wavelets.NDWTTest do
     Enum.zip(signal, reconstructed)
     |> Enum.each(fn {orig, recon} -> assert_close_2d(orig, recon, 1.0e-8) end)
 
-    # Verify energy conservation
+    # Fix energy calculation for 3D signal
     original_energy =
-      signal |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
+      Enum.sum(
+        for s <- signal,
+            row <- s,
+            val <- row,
+            do: val * val
+      )
 
     transform_energy =
-      (List.flatten(approx) ++ List.flatten(details))
-      |> Enum.map(&(&1 * &1))
+      for(
+        s <- approx,
+        row <- s,
+        val <- row,
+        do: val * val
+      )
+      |> (Enum.sum() +
+            for(
+              s <- details,
+              row <- s,
+              val <- row,
+              do: val * val
+            ))
       |> Enum.sum()
 
     assert_in_delta original_energy, transform_energy, 1.0e-8

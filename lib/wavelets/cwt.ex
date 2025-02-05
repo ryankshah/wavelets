@@ -45,15 +45,16 @@ defmodule Wavelets.CWT do
          signal_length,
          _energy_factor
        ) do
-    # PyWavelets uses this window size calculation
+    # Follow PyWavelets window sizing
     width = 10 * scale
     window_size = min(signal_length - 1, round(width))
 
-    # PyWavelets normalization
-    scale_factor = :math.sqrt(1 / scale)
+    # Use same normalization as PyWavelets
+    norm_factor = 1.0 / scale
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
+      # Center window properly
       half_window = div(window_size, 2)
       start_idx = max(0, pos - half_window)
       end_idx = min(signal_length - 1, pos + half_window)
@@ -65,13 +66,17 @@ defmodule Wavelets.CWT do
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
+          # Include normalization in the wavelet values
+          psi_re = psi_re * norm_factor
+          psi_im = psi_im * norm_factor
+
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      {re * scale_factor, im * scale_factor}
+      {re * :math.sqrt(dt), im * :math.sqrt(dt)}
     end)
   end
 
