@@ -13,11 +13,15 @@ defmodule Wavelets.DWT do
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          approx = (x1 + x2)  # Average
-          detail = (x1 - x2)  # Difference
+          # Average
+          approx = x1 + x2
+          # Difference
+          detail = x1 - x2
           {approx, detail}
 
-        [x] -> {x, 0.0}  # Handle odd-length signals
+        # Handle odd-length signals
+        [x] ->
+          {x, 0.0}
       end)
       |> Enum.unzip()
 

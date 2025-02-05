@@ -19,6 +19,7 @@ defmodule Wavelets.NDWT do
       _ when dims > 2 ->
         # Scale by 2 for each additional dimension
         scale = :math.pow(2, dims - 2)
+
         {approx, details} =
           signal
           |> Enum.map(&forward(&1, filter, dims - 1, precision))
@@ -29,12 +30,15 @@ defmodule Wavelets.NDWT do
   end
 
   defp scale_signal(data, scale) when is_number(data), do: data * scale
+
   defp scale_signal(data, scale) when is_list(data) do
     Enum.map(data, &scale_signal(&1, scale))
   end
+
   defp scale_signal({a, b}, scale) do
     {scale_signal(a, scale), scale_signal(b, scale)}
   end
+
   defp scale_signal({a, b, c}, scale) do
     {scale_signal(a, scale), scale_signal(b, scale), scale_signal(c, scale)}
   end

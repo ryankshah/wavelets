@@ -37,9 +37,17 @@ defmodule Wavelets.CWT do
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, _energy_factor) do
-    window_size = min(signal_length - 1, max(10, round(8 * scale)))  # Doubled window size
-    
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         _energy_factor
+       ) do
+    # Doubled window size
+    window_size = min(signal_length - 1, max(10, round(8 * scale)))
+
     # Scale factor includes dt for energy preservation
     scale_factor = dt / :math.sqrt(scale)
 

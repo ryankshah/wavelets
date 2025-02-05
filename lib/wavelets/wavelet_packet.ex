@@ -22,7 +22,7 @@ defmodule Wavelets.WaveletPacket do
 
   defp build_level(tree, filter, level, precision) do
     prev_level = level - 1
-    
+
     prev_nodes =
       for {key = {^prev_level, _}, signal} <- tree, into: %{} do
         {key, signal}
@@ -35,7 +35,7 @@ defmodule Wavelets.WaveletPacket do
       prev_nodes
       |> Enum.flat_map(fn {{_, j}, signal} ->
         {approx, details} = DWT.forward_1d(signal, filter, precision)
-        
+
         [
           {{level, j * 2}, approx |> Enum.map(&(&1 * scale))},
           {{level, j * 2 + 1}, details |> Enum.map(&(&1 * scale))}
