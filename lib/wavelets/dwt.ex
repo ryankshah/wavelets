@@ -13,14 +13,12 @@ defmodule Wavelets.DWT do
       pairs
       |> Enum.map(fn
         [x1, x2] ->
-          # Exactly match PyWavelets scaling
+          # PyWavelets uses exactly this scaling
           approx = (x1 + x2) / scale
           detail = (x1 - x2) / scale
           {approx, detail}
 
-        # Match scaling for odd length
-        [x] ->
-          {x / scale, 0.0}
+        [x] -> {x, 0.0}  # For odd length, keep original value
       end)
       |> Enum.unzip()
 
@@ -28,11 +26,11 @@ defmodule Wavelets.DWT do
   end
 
   def forward_2d(signal_2d, filter, precision \\ :double) do
-    # Apply to rows first
+    # First rows
     row_transformed = Enum.map(signal_2d, &forward_1d(&1, filter, precision))
     {low_rows, high_rows} = Enum.unzip(row_transformed)
 
-    # Then to columns, maintaining orthonormality
+    # Then columns
     {approximation, vertical_details} =
       transpose(low_rows)
       |> Enum.map(&forward_1d(&1, filter, precision))
