@@ -14,11 +14,10 @@ defmodule Wavelets.CWT do
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
 
-    # PyWavelets centers and normalizes the signal first
+    # Center the signal as in PyWavelets
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Transform at each scale
     scales
     |> Enum.map(fn scale ->
       coeffs =
@@ -35,8 +34,11 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # PyWavelets' window size calculation
+    # Standard window size
     window_size = min(signal_length - 1, round(8 * scale))
+
+    # Additional factor of 2 for Morlet wavelet normalization
+    base_norm = 2.0 * :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -44,7 +46,6 @@ defmodule Wavelets.CWT do
       start_idx = max(0, pos - half_window)
       end_idx = min(signal_length - 1, pos + half_window)
 
-      # PyWavelets uses a single normalization after the integration
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
@@ -52,16 +53,15 @@ defmodule Wavelets.CWT do
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # No scaling inside the integral
+          # Integrate without scaling
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      # PyWavelets scaling matches their C code
-      norm = :math.sqrt(dt / scale)
-      {re * norm, im * norm}
+      # Apply normalization once
+      {re * base_norm, im * base_norm}
     end)
   end
 
