@@ -10,54 +10,62 @@ defmodule Wavelets.CWT do
   """
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
-    # Center signal
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Compute transform at each scale
     scales
     |> Enum.map(fn scale ->
-      # Follow PyWavelets' order: convolve, then take derivative
+      # First get integrated wavelet like PyWavelets
+      {int_psi_re, _} = integrate_wavelet(wavelet_fn)
+
+      # Then convolve with signal
       convolved =
-        convolve_signal(centered_signal, wavelet_fn, scale, dt, signal_length)
+        convolve_with_signal(
+          centered_signal,
+          int_psi_re,
+          scale,
+          dt,
+          signal_length
+        )
 
-      # Then differentiate and scale by sqrt(scale)
-      coeffs =
-        convolved
-        |> diff_and_scale(scale)
-
+      # Finally take derivative and scale
+      coeffs = take_derivative(convolved, scale)
       {scale, coeffs}
     end)
   end
 
-  defp integrate_wavelet(wavelet_fn, scale) do
-    dx = 0.1 / scale
-    points = -50..50
+  defp integrate_wavelet(wavelet_fn) do
+    # Use fine grid for integration
+    dx = 0.01
+    points = -100..100
+    x_values = Enum.map(points, fn i -> i * dx end)
 
-    wavelet_points =
-      points
-      |> Enum.map(fn i ->
-        x = i * dx
+    # Get wavelet values 
+    wavelet_values =
+      Enum.map(x_values, fn x ->
         {psi_re, psi_im} = wavelet_fn.(x)
-        IO.puts("Wavelet at x=#{x}: #{inspect({psi_re, psi_im})}")
-        {psi_re, psi_im}
+        # Multiply by dx for integration
+        psi_re * dx
       end)
 
-    {int_re, int_im} =
-      Enum.reduce(wavelet_points, {0.0, 0.0}, fn {psi_re, psi_im},
-                                                 {acc_re, acc_im} ->
-        {
-          acc_re + psi_re * dx,
-          acc_im + psi_im * dx
-        }
+    # Cumulative sum for integration
+    {integrated, _} =
+      Enum.reduce(wavelet_values, {[], 0.0}, fn val, {acc, sum} ->
+        new_sum = sum + val
+        {[new_sum | acc], new_sum}
       end)
 
-    IO.puts("Integral: #{inspect({int_re, int_im})}")
-    {int_re, int_im}
+    {Enum.reverse(integrated), dx}
   end
 
-  defp convolve_signal(signal, wavelet_fn, scale, dt, signal_length) do
-    # PyWavelets window size
+  defp convolve_with_signal(
+         signal,
+         integrated_wavelet,
+         scale,
+         dt,
+         signal_length
+       ) do
+    # Use same window size as PyWavelets
     window_size = min(signal_length - 1, round(8 * scale))
 
     0..(signal_length - 1)
@@ -66,23 +74,33 @@ defmodule Wavelets.CWT do
       start_idx = max(0, pos - half_window)
       end_idx = min(signal_length - 1, pos + half_window)
 
+      # Convolve with integrated wavelet
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          t = (i - pos) * dt / scale
-          {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
-
-          # Scale by sqrt(dt/scale) during convolution
-          norm = :math.sqrt(dt / scale)
+          psi = integrated_wavelet |> Enum.at(i - start_idx, 0.0)
 
           {
-            re_acc + signal_val * psi_re * norm,
-            im_acc + signal_val * psi_im * norm
+            re_acc + signal_val * psi * dt / scale,
+            im_acc
           }
         end)
 
       {re, im}
+    end)
+  end
+
+  defp take_derivative(convolved, scale) do
+    # Match PyWavelets exactly: -sqrt(scale) * diff
+    scale_factor = -:math.sqrt(scale)
+
+    convolved
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [{conv1_re, conv1_im}, {conv2_re, conv2_im}] ->
+      d_re = conv2_re - conv1_re
+      d_im = conv2_im - conv1_im
+      {d_re * scale_factor, d_im * scale_factor}
     end)
   end
 
