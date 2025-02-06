@@ -10,23 +10,24 @@ defmodule Wavelets.CWTTest do
 
     wavelet_fn = fn x ->
       norm = :math.exp(-x * x / 2)
+      # Match PyWavelets' Morlet exactly
       {:math.cos(5 * x) * norm, :math.sin(5 * x) * norm}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
-
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
-    # Each scale contributes proportionally
     total_energy =
-      Enum.sum(
-        for {scale, coeffs} <- result do
-          Enum.sum(
-            coeffs
-            |> Enum.map(fn {re, im} -> (re * re + im * im) * scale end)
-          )
-        end
-      )
+      result
+      |> Enum.map(fn {scale, coeffs} ->
+        # Scale contribution matches PyWavelets
+        Enum.sum(
+          Enum.map(coeffs, fn {re, im} ->
+            (re * re + im * im) * scale
+          end)
+        )
+      end)
+      |> Enum.sum()
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
   end
