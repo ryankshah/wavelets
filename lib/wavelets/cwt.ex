@@ -15,14 +15,11 @@ defmodule Wavelets.CWT do
 
     scales
     |> Enum.map(fn scale ->
-      # Use inverse scale like PyWavelets
-      inv_scale = 1.0 / scale
-
       coeffs =
         transform_at_scale(
           centered_signal,
           wavelet_fn,
-          inv_scale,
+          scale,
           dt,
           signal_length
         )
@@ -32,33 +29,53 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Window size uses scale directly now that we're passing inverse scale
-    window_size = min(signal_length - 1, round(8 / scale))
+    # Get the central frequency for this wavelet
+    # For Morlet wavelet with ω0=5
+    central_freq = 5.0
 
-    0..(signal_length - 1)
-    |> Enum.map(fn pos ->
-      half_window = div(window_size, 2)
-      start_idx = max(0, pos - half_window)
-      end_idx = min(signal_length - 1, pos + half_window)
+    # Window size calculation from PyWavelets
+    window_size = min(signal_length - 1, round(8 * scale))
 
-      # Convolution
-      {conv_re, conv_im} =
-        start_idx..end_idx
-        |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          # Use scale here
-          t = (i - pos) * dt * scale
-          {psi_re, psi_im} = wavelet_fn.(t)
-          signal_val = Enum.at(signal, i)
+    # First compute convolution
+    convolution =
+      0..(signal_length - 1)
+      |> Enum.map(fn pos ->
+        half_window = div(window_size, 2)
+        start_idx = max(0, pos - half_window)
+        end_idx = min(signal_length - 1, pos + half_window)
 
-          {
-            re_acc + signal_val * psi_re,
-            im_acc + signal_val * psi_im
-          }
-        end)
+        # Convolve with wavelet
+        {conv_re, conv_im} =
+          start_idx..end_idx
+          |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+            t = (i - pos) * dt / scale
+            {psi_re, psi_im} = wavelet_fn.(t)
+            signal_val = Enum.at(signal, i)
 
-      # Normalize by 1/sqrt(1/scale) = sqrt(scale)
-      norm = scale
-      {conv_re * norm, conv_im * norm}
+            {
+              re_acc + signal_val * psi_re,
+              im_acc + signal_val * psi_im
+            }
+          end)
+
+        {conv_re, conv_im}
+      end)
+
+    # Then take derivative and scale by sqrt(scale)
+    convolution
+    |> Enum.with_index()
+    |> Enum.map(fn {{re, im}, i} ->
+      if i > 0 do
+        {prev_re, prev_im} = Enum.at(convolution, i - 1)
+        deriv_re = (re - prev_re) / dt
+        deriv_im = (im - prev_im) / dt
+
+        # Scale by sqrt(scale) as in PyWavelets
+        scale_factor = :math.sqrt(scale)
+        {-deriv_re * scale_factor, -deriv_im * scale_factor}
+      else
+        {0.0, 0.0}
+      end
     end)
   end
 
