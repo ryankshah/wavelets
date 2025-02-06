@@ -8,10 +8,12 @@ defmodule Wavelets.CWTTest do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     scales = [1.0, 2.0, 4.0]
 
+    # Exact match of PyWavelets' ref_morl
     wavelet_fn = fn x ->
       norm = :math.exp(-x * x / 2)
-      freq = 5.0 * :math.pi()
-      {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
+      coeff = :math.cos(5 * x)
+      # Real wavelet
+      {norm * coeff, 0.0}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
@@ -38,28 +40,25 @@ defmodule Wavelets.CWTTest do
 
     scales = [1.0, 2.0, 4.0]
 
+    # Match PyWavelets' ref_morl exactly
     wavelet_fn = fn x ->
-      # Keep wavelet scaling consistent with energy test
       norm = :math.exp(-x * x / 2)
-      freq = 5.0 * :math.pi()
-      {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
+      coeff = :math.cos(5 * x)
+      {norm * coeff, 0.0}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
 
     [{scale1, coeffs1}, {scale2, coeffs2} | _] = result
 
-    # Scale the amplitudes by sqrt(scale) for admissibility
     max_amp1 =
       coeffs1
       |> Enum.map(&CWT.coefficient_magnitude/1)
-      |> Enum.map(&(&1 * :math.sqrt(scale1)))
       |> Enum.max()
 
     max_amp2 =
       coeffs2
       |> Enum.map(&CWT.coefficient_magnitude/1)
-      |> Enum.map(&(&1 * :math.sqrt(scale2)))
       |> Enum.max()
 
     theoretical_ratio = :math.sqrt(scale2 / scale1)
