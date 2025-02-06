@@ -23,11 +23,7 @@ defmodule Wavelets.CWTTest do
 
     total_energy =
       result
-      |> Enum.map(fn {scale, coeffs} ->
-        coeffs
-        |> Enum.map(fn {re, im} -> re * re + im * im end)
-        |> Enum.sum()
-      end)
+      |> Enum.map(fn {_, coeffs} -> CWT.compute_scale_energy(coeffs) end)
       |> Enum.sum()
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
@@ -68,6 +64,7 @@ defmodule Wavelets.CWTTest do
     theoretical_ratio = :math.sqrt(scale2 / scale1)
     actual_ratio = max_amp2 / max_amp1
 
-    assert_in_delta theoretical_ratio, actual_ratio, 0.1
+    # Tighter tolerance
+    assert_in_delta theoretical_ratio, actual_ratio, 0.05
   end
 end
