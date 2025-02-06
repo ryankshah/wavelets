@@ -39,9 +39,8 @@ defmodule Wavelets.CWTTest do
 
     scales = [1.0, 2.0, 4.0]
 
-    # Same modified Morlet wavelet
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0)
+      norm = :math.exp(-x * x / 2) * (:math.sqrt(2.0) / :math.sqrt(:math.pi()))
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
     end
