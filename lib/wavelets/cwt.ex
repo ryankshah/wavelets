@@ -10,81 +10,84 @@ defmodule Wavelets.CWT do
   """
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
+
+    # Center signal
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Get wavelet integral for normalization
-    {wavelet_norm, _} = compute_wavelet_norm(wavelet_fn)
-
-    # Use inverse scales like PyWavelets
     scales
     |> Enum.map(fn scale ->
-      # Use inverse scale in transform
-      inv_scale = 1.0 / scale
+      # Get integrated wavelet at this scale
+      {int_psi_re, int_psi_im} = integrate_wavelet(wavelet_fn, scale)
 
-      coeffs =
-        transform_at_scale(
-          centered_signal,
-          wavelet_fn,
-          inv_scale,
-          dt,
-          signal_length,
-          wavelet_norm
-        )
+      # Do convolution with integrated wavelet
+      convolved = convolve_signal(centered_signal, {int_psi_re, int_psi_im})
+
+      # Take derivative and scale
+      coeffs = derivative_and_scale(convolved, scale)
 
       {scale, coeffs}
     end)
   end
 
-  defp compute_wavelet_norm(wavelet_fn) do
-    dx = 0.001
+  defp integrate_wavelet(wavelet_fn, scale) do
+    # Integration points
+    dx = 1.0 / scale
+    points = -20..20
 
-    points =
-      -10..10
+    # Get wavelet values
+    wavelet_points =
+      points
       |> Enum.map(fn i ->
         x = i * dx
-        {psi_re, psi_im} = wavelet_fn.(x)
-        psi_re * psi_re + psi_im * psi_im
+        wavelet_fn.(x)
       end)
 
-    norm = Enum.sum(points) * dx
-    {norm, dx}
+    # Integrate using trapezoid rule
+    {_, int_re, int_im} =
+      Enum.reduce(wavelet_points, {nil, 0.0, 0.0}, fn {psi_re, psi_im},
+                                                      {prev, acc_re, acc_im} ->
+        case prev do
+          nil ->
+            {{psi_re, psi_im}, acc_re, acc_im}
+
+          {prev_re, prev_im} ->
+            new_re = acc_re + (psi_re + prev_re) * dx / 2
+            new_im = acc_im + (psi_im + prev_im) * dx / 2
+            {{psi_re, psi_im}, new_re, new_im}
+        end
+      end)
+
+    {int_re, int_im}
   end
 
-  defp transform_at_scale(
-         signal,
-         wavelet_fn,
-         scale,
-         dt,
-         signal_length,
-         wavelet_norm
-       ) do
-    # Note: scale here is already inverted (1/s)
-    window_size = min(signal_length - 1, round(8 / scale))
+  defp convolve_signal(signal, {int_psi_re, int_psi_im}) do
+    signal_length = length(signal)
 
-    0..(signal_length - 1)
-    |> Enum.map(fn pos ->
-      half_window = div(window_size, 2)
-      start_idx = max(0, pos - half_window)
-      end_idx = min(signal_length - 1, pos + half_window)
+    # Full convolution like numpy.convolve
+    -signal_length..signal_length
+    |> Enum.map(fn i ->
+      Enum.reduce(0..(signal_length - 1), {0.0, 0.0}, fn j, {acc_re, acc_im} ->
+        signal_val = Enum.at(signal, j, 0.0)
 
-      {conv_re, conv_im} =
-        start_idx..end_idx
-        |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          # Using inverted scale
-          t = (i - pos) * dt * scale
-          {psi_re, psi_im} = wavelet_fn.(t)
-          signal_val = Enum.at(signal, i)
+        {
+          acc_re + signal_val * int_psi_re,
+          acc_im + signal_val * int_psi_im
+        }
+      end)
+    end)
+  end
 
-          {
-            re_acc + signal_val * psi_re,
-            im_acc + signal_val * psi_im
-          }
-        end)
-
-      # Use sqrt(scale) = sqrt(1/s) for normalization
-      norm = :math.sqrt(scale) / :math.sqrt(wavelet_norm)
-      {conv_re * norm, conv_im * norm}
+  defp derivative_and_scale(convolved, scale) do
+    # Take derivative using diff
+    convolved
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [{re1, im1}, {re2, im2}] ->
+      d_re = re2 - re1
+      d_im = im2 - im1
+      # Scale by -sqrt(scale) like PyWavelets
+      norm = -:math.sqrt(scale)
+      {d_re * norm, d_im * norm}
     end)
   end
 
