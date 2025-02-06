@@ -37,6 +37,17 @@ defmodule Wavelets.CWT do
     end)
   end
 
+  def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0) do
+    signal_length = length(signal)
+
+    for scale <- scales do
+      coeffs =
+        transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, 1.0)
+
+      {scale, coeffs}
+    end
+  end
+
   defp transform_at_scale(
          signal,
          wavelet_fn,
