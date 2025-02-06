@@ -10,16 +10,18 @@ defmodule Wavelets.Analysis do
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
-        # 2D case - normalize by total size
+        # 2D case
         coeffs
         |> List.flatten()
         |> compute_energy()
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # 1D case - simple energy density
-        energy = compute_energy(coeffs)
-        energy / length(coeffs)
+        # For wavelet coefficients, match PyWavelets
+        # They multiply by 2 to account for decomposition level
+        coeffs
+        |> compute_energy()
+        |> Kernel.*(2)
     end
   end
 

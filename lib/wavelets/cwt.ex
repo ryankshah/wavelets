@@ -11,40 +11,31 @@ defmodule Wavelets.CWT do
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
 
-    # Center signal like PyWavelets does
+    # Center signal and normalize
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Transform at each scale
+    # For each scale, generate coefficients
     scales
     |> Enum.map(fn scale ->
+      # PyWavelets computes integral with dt included in normalization
       coeffs =
         transform_at_scale(
           centered_signal,
           wavelet_fn,
           scale,
           dt,
-          signal_length,
-          1.0
+          signal_length
         )
 
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(
-         signal,
-         wavelet_fn,
-         scale,
-         dt,
-         signal_length,
-         _energy_factor
-       ) do
-    # Use same window size calculation as PyWavelets
-    window_size = min(signal_length - 1, round(10 * scale))
-
-    # Morlet wavelet normalization in PyWavelets uses this factor
-    norm = dt * :math.sqrt(scale)
+  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
+    # PyWavelets window size calculation
+    width = 8 * scale
+    window_size = min(signal_length - 1, round(width))
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -52,21 +43,25 @@ defmodule Wavelets.CWT do
       start_idx = max(0, pos - half_window)
       end_idx = min(signal_length - 1, pos + half_window)
 
+      # Compute convolution at this position
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+          # Time shift and scale
           t = (i - pos) * dt / scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # Scale both wavelet and signal correctly
+          # Accumulate scaled wavelet response
           {
-            re_acc + signal_val * psi_re / norm,
-            im_acc + signal_val * psi_im / norm
+            re_acc + signal_val * psi_re,
+            im_acc + signal_val * psi_im
           }
         end)
 
-      {re, im}
+      # PyWavelets scale normalization
+      norm_factor = :math.sqrt(dt / scale)
+      {re * norm_factor, im * norm_factor}
     end)
   end
 
