@@ -15,31 +15,26 @@ defmodule Wavelets.CWT do
 
     scales
     |> Enum.map(fn scale ->
-      # Integrate wavelet first at this scale
       integrated_wavelet = integrate_morlet(scale)
-      # Do convolution via FFT
       coeffs = fft_convolve(centered_signal, integrated_wavelet, scale)
       {scale, coeffs}
     end)
   end
 
   defp integrate_morlet(scale) do
-    # PyWavelets uses fixed integration points
     dx = 0.1
-    # power of 2 for FFT
     n_points = 1024
     points = -div(n_points, 2)..div(n_points, 2)
 
     points
     |> Enum.map(fn i ->
       x = i * dx / scale
-      # Morlet wavelet integral
+      # Morlet wavelet
       term1 = :math.exp(-x * x / 2)
       term2 = :math.cos(5 * x)
       value = term1 * term2 * dx
       value
     end)
-    # Cumulative sum for integration
     |> Enum.scan(&(&1 + &2))
   end
 
@@ -47,35 +42,41 @@ defmodule Wavelets.CWT do
     n = length(signal)
     pad_length = next_power_of_2(n + length(wavelet) - 1)
 
-    # Pad signals to power of 2
+    # Pad signals with zeros
     padded_signal = pad_to_length(signal, pad_length)
     padded_wavelet = pad_to_length(wavelet, pad_length)
 
-    # Convert to Nx tensors
-    signal_tensor = Nx.tensor(padded_signal, type: {:f, 64})
-    wavelet_tensor = Nx.tensor(padded_wavelet, type: {:f, 64})
+    # Convert to complex tensors
+    signal_tensor =
+      Nx.tensor(padded_signal ++ List.duplicate(0.0, pad_length))
+      |> Nx.reshape({pad_length, 2})
 
-    # FFT both signals
+    wavelet_tensor =
+      Nx.tensor(padded_wavelet ++ List.duplicate(0.0, pad_length))
+      |> Nx.reshape({pad_length, 2})
+
+    # FFT
     signal_fft = Nx.fft(signal_tensor)
     wavelet_fft = Nx.fft(wavelet_tensor)
 
-    # Multiply in frequency domain
+    # Multiply in frequency domain (complex multiply)
     convolved_fft = Nx.multiply(signal_fft, wavelet_fft)
 
-    # IFFT back to time domain
-    convolved =
-      Nx.ifft(convolved_fft)
-      |> Nx.to_list()
-      # Take only original signal length
-      |> Enum.take(n)
+    # IFFT
+    convolved = Nx.ifft(convolved_fft)
+
+    # Extract real part and take only needed length
+    convolved_real =
+      convolved[0..(n - 1)][0]
+      |> Nx.to_flat_list()
 
     # Take derivative and scale
-    convolved
+    convolved_real
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [x1, x2] ->
       dx = x2 - x1
       factor = -:math.sqrt(scale)
-      # Real wavelet so imaginary part is 0
+      # Morlet is real-valued
       {dx * factor, 0.0}
     end)
   end
