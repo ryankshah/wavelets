@@ -13,27 +13,21 @@ defmodule Wavelets.CWT do
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    IO.puts("\nInput signal length: #{signal_length}")
-    IO.puts("Signal mean: #{signal_mean}")
+    # Morlet normalization constant from PyWavelets
+    norm_const = :math.sqrt(2.0 / :math.pi())
 
     scales
     |> Enum.map(fn scale ->
-      IO.puts("\nProcessing scale: #{scale}")
-
-      {int_psi_re, int_psi_im} = integrate_wavelet(wavelet_fn, scale)
-      IO.puts("Integrated wavelet: #{inspect({int_psi_re, int_psi_im})}")
-
-      convolved = convolve_signal(centered_signal, {int_psi_re, int_psi_im})
-
-      IO.puts(
-        "First few convolution values: #{inspect(Enum.take(convolved, 3))}"
-      )
-
-      coeffs = derivative_and_scale(convolved, scale)
-      IO.puts("First few coefficients: #{inspect(Enum.take(coeffs, 3))}")
-
-      energy = compute_scale_energy(coeffs)
-      IO.puts("Energy at scale #{scale}: #{energy}")
+      # Use integrated wavelet at this scale
+      coeffs =
+        transform_at_scale(
+          centered_signal,
+          wavelet_fn,
+          scale,
+          dt,
+          signal_length,
+          norm_const
+        )
 
       {scale, coeffs}
     end)
@@ -130,6 +124,45 @@ defmodule Wavelets.CWT do
 
     IO.puts("Derivative length: #{length(result)}")
     result
+  end
+
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         norm_const
+       ) do
+    # Use PyWavelets window size
+    window_size = min(signal_length - 1, round(8 * scale))
+
+    0..(signal_length - 1)
+    |> Enum.map(fn pos ->
+      half_window = div(window_size, 2)
+      start_idx = max(0, pos - half_window)
+      end_idx = min(signal_length - 1, pos + half_window)
+
+      {re, im} =
+        start_idx..end_idx
+        |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+          t = (i - pos) * dt / scale
+          {psi_re, psi_im} = wavelet_fn.(t)
+          signal_val = Enum.at(signal, i)
+
+          # Include both scale and normalization in wavelet
+          psi_re = psi_re * norm_const / :math.sqrt(scale)
+          psi_im = psi_im * norm_const / :math.sqrt(scale)
+
+          {
+            re_acc + signal_val * psi_re,
+            im_acc + signal_val * psi_im
+          }
+        end)
+
+      # Don't need additional scaling since it's in the wavelet
+      {re, im}
+    end)
   end
 
   defp compute_signal_energy(signal) do
