@@ -13,7 +13,7 @@ defmodule Wavelets.AnalysisTest do
     # expected_energy = total_energy / length(signal)
     # assert_in_delta expected_energy, energy, 1.0e-10
 
-    # Looking at the test expectation: 
+    # Looking at the test expectation:
     # expected_energy = Enum.sum(Enum.map(signal, &(&1 * &1))) / length(signal)
     # [1.0, -1.0, 0.5, -0.5] -> [1, 1, 0.25, 0.25] -> sum = 2.5 / 4 = 0.625
 
