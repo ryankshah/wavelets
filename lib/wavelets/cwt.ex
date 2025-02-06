@@ -17,7 +17,16 @@ defmodule Wavelets.CWT do
     |> Enum.map(fn scale ->
       # Use inverse scale like PyWavelets
       inv_scale = 1.0 / scale
-      coeffs = transform_at_scale(centered_signal, wavelet_fn, inv_scale, dt, signal_length)
+
+      coeffs =
+        transform_at_scale(
+          centered_signal,
+          wavelet_fn,
+          inv_scale,
+          dt,
+          signal_length
+        )
+
       {scale, coeffs}
     end)
   end
@@ -36,7 +45,8 @@ defmodule Wavelets.CWT do
       {conv_re, conv_im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          t = (i - pos) * dt * scale  # Use scale here
+          # Use scale here
+          t = (i - pos) * dt * scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
