@@ -29,7 +29,7 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # PyWavelets window size 
+    # PyWavelets window size
     width = 8 * scale
     window_size = min(signal_length - 1, round(width))
 
