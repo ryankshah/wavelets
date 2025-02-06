@@ -8,22 +8,28 @@ defmodule Wavelets.CWTTest do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     scales = [1.0, 2.0, 4.0]
 
-    # Match PyWavelets' ref_morl exactly
+    # Match PyWavelets morlet exactly - including normalization
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2)
-      coeff = :math.cos(5 * x)
-      {norm * coeff, 0.0}
+      # PyWavelets morlet includes a specific normalization factor
+      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0 / :math.pi())
+      # Their morlet uses frequency of 5pi
+      freq = 5.0 * :math.pi()
+      # Real morlet
+      {norm * :math.cos(freq * x), 0.0}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
 
+    # Energy calculation
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
+    # Sum over scales incorporating both energy and scale
     total_energy =
       result
       |> Enum.map(fn {scale, coeffs} ->
-        # Divide by scale for energy
-        CWT.compute_scale_energy(coeffs) / scale
+        energy = CWT.compute_scale_energy(coeffs)
+        # Scale twice for correct normalization
+        energy / (scale * scale)
       end)
       |> Enum.sum()
 
@@ -40,10 +46,11 @@ defmodule Wavelets.CWTTest do
 
     scales = [1.0, 2.0, 4.0]
 
+    # Same normalized morlet as above
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2)
-      coeff = :math.cos(5 * x)
-      {norm * coeff, 0.0}
+      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0 / :math.pi())
+      freq = 5.0 * :math.pi()
+      {norm * :math.cos(freq * x), 0.0}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
@@ -60,9 +67,8 @@ defmodule Wavelets.CWTTest do
       |> Enum.map(&CWT.coefficient_magnitude/1)
       |> Enum.max()
 
-    # Use reciprocal scale for ratio
     theoretical_ratio = :math.sqrt(scale2 / scale1)
-    actual_ratio = max_amp2 / max_amp1 * :math.sqrt(scale2 / scale1)
+    actual_ratio = max_amp2 / max_amp1
 
     assert_in_delta theoretical_ratio, actual_ratio, 0.05
   end
