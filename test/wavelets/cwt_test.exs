@@ -9,7 +9,6 @@ defmodule Wavelets.CWTTest do
     scales = [1.0, 2.0, 4.0]
 
     wavelet_fn = fn x ->
-      # Scale wavelet by 1/sqrt(scale) to preserve energy
       norm = :math.exp(-x * x / 2)
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
@@ -19,12 +18,23 @@ defmodule Wavelets.CWTTest do
 
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
+    # Add delta_j term for scale integration
+    delta_j = (Enum.max(scales) - Enum.min(scales)) / (length(scales) - 1)
+
     total_energy =
       result
       |> Enum.map(fn {scale, coeffs} ->
-        CWT.compute_scale_energy(coeffs)
+        # Include both scale and delta_j in energy computation
+        scale_factor = delta_j / (scale * scale)
+
+        coeffs
+        |> Enum.map(fn {re, im} -> re * re + im * im end)
+        |> Enum.sum()
+        |> Kernel.*(scale_factor)
       end)
       |> Enum.sum()
+      # Factor of 2 for positive frequencies only
+      |> Kernel.*(2.0)
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
   end
