@@ -8,15 +8,10 @@ defmodule Wavelets.CWT do
   @doc """
   Performs 1D continuous wavelet transform
   """
-  def transform_1d(signal, wavelet_fn, scales, _precision \\ :double) do
-    dt = 1.0
+  def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
 
-    # Calculate signal energy for proper normalization
-    signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-    energy_factor = :math.sqrt(signal_energy)
-
-    # Center signal
+    # Center signal like PyWavelets does
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
@@ -30,22 +25,11 @@ defmodule Wavelets.CWT do
           scale,
           dt,
           signal_length,
-          energy_factor
+          1.0
         )
 
       {scale, coeffs}
     end)
-  end
-
-  def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0) do
-    signal_length = length(signal)
-
-    for scale <- scales do
-      coeffs =
-        transform_at_scale(signal, wavelet_fn, scale, dt, signal_length, 1.0)
-
-      {scale, coeffs}
-    end
   end
 
   defp transform_at_scale(
