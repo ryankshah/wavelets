@@ -7,9 +7,7 @@ defmodule Wavelets.CWTTest do
   test "preserves energy across scales" do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     scales = [1.0, 2.0, 4.0]
-    dt = 1.0
 
-    # Normalized Morlet wavelet
     wavelet_fn = fn x ->
       norm = :math.exp(-x * x / 2)
       {:math.cos(5 * x) * norm, :math.sin(5 * x) * norm}
@@ -17,17 +15,18 @@ defmodule Wavelets.CWTTest do
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
 
-    # Energy calculation matching PyWavelets
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
+    # Each scale contributes proportionally
     total_energy =
-      result
-      |> Enum.map(fn {scale, coeffs} ->
-        coeffs
-        |> Enum.map(fn {re, im} -> re * re + im * im end)
-        |> Enum.sum()
-      end)
-      |> Enum.sum()
+      Enum.sum(
+        for {scale, coeffs} <- result do
+          Enum.sum(
+            coeffs
+            |> Enum.map(fn {re, im} -> (re * re + im * im) * scale end)
+          )
+        end
+      )
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
   end

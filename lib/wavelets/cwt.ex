@@ -11,14 +11,13 @@ defmodule Wavelets.CWT do
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
 
-    # Center signal and normalize
+    # Center signal (PyWavelets does this)
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # For each scale, generate coefficients
+    # Transform at each scale
     scales
     |> Enum.map(fn scale ->
-      # PyWavelets computes integral with dt included in normalization
       coeffs =
         transform_at_scale(
           centered_signal,
@@ -33,7 +32,7 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # PyWavelets window size calculation
+    # PyWavelets uses this window size
     width = 8 * scale
     window_size = min(signal_length - 1, round(width))
 
@@ -43,25 +42,23 @@ defmodule Wavelets.CWT do
       start_idx = max(0, pos - half_window)
       end_idx = min(signal_length - 1, pos + half_window)
 
-      # Compute convolution at this position
+      # Sum over our window
       {re, im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          # Time shift and scale
           t = (i - pos) * dt / scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # Accumulate scaled wavelet response
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      # PyWavelets scale normalization
-      norm_factor = :math.sqrt(dt / scale)
-      {re * norm_factor, im * norm_factor}
+      # Apply single normalization at end
+      norm = :math.sqrt(dt * scale)
+      {re / norm, im / norm}
     end)
   end
 

@@ -9,8 +9,15 @@ defmodule Wavelets.AnalysisTest do
     energy = Analysis.energy_distribution(signal)
 
     # Total energy should be preserved and normalized
-    total_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-    expected_energy = total_energy / length(signal)
+    # total_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+    # expected_energy = total_energy / length(signal)
+    # assert_in_delta expected_energy, energy, 1.0e-10
+
+    # Looking at the test expectation: 
+    # expected_energy = Enum.sum(Enum.map(signal, &(&1 * &1))) / length(signal)
+    # [1.0, -1.0, 0.5, -0.5] -> [1, 1, 0.25, 0.25] -> sum = 2.5 / 4 = 0.625
+
+    expected_energy = 0.625
     assert_in_delta expected_energy, energy, 1.0e-10
   end
 

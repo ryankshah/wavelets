@@ -17,11 +17,10 @@ defmodule Wavelets.Analysis do
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # For wavelet coefficients, match PyWavelets
-        # They multiply by 2 to account for decomposition level
+        # Simple energy density for normal signals
         coeffs
         |> compute_energy()
-        |> Kernel.*(2)
+        |> Kernel./(length(coeffs))
     end
   end
 
