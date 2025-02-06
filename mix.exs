@@ -42,6 +42,7 @@ defmodule Wavelets.MixProject do
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:nx, "~> 0.6.2"},
 
       # Test dependencies
       {:excoveralls, "~> 0.18", only: :test},

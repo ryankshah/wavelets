@@ -15,23 +15,79 @@ defmodule Wavelets.CWT do
 
     scales
     |> Enum.map(fn scale ->
-      # First get integrated wavelet like PyWavelets
-      {int_psi_re, _} = integrate_wavelet(wavelet_fn)
-
-      # Then convolve with signal
-      convolved =
-        convolve_with_signal(
-          centered_signal,
-          int_psi_re,
-          scale,
-          dt,
-          signal_length
-        )
-
-      # Finally take derivative and scale
-      coeffs = take_derivative(convolved, scale)
+      # Integrate wavelet first at this scale
+      integrated_wavelet = integrate_morlet(scale)
+      # Do convolution via FFT
+      coeffs = fft_convolve(centered_signal, integrated_wavelet, scale)
       {scale, coeffs}
     end)
+  end
+
+  defp integrate_morlet(scale) do
+    # PyWavelets uses fixed integration points
+    dx = 0.1
+    # power of 2 for FFT
+    n_points = 1024
+    points = -div(n_points, 2)..div(n_points, 2)
+
+    points
+    |> Enum.map(fn i ->
+      x = i * dx / scale
+      # Morlet wavelet integral 
+      term1 = :math.exp(-x * x / 2)
+      term2 = :math.cos(5 * x)
+      value = term1 * term2 * dx
+      value
+    end)
+    # Cumulative sum for integration
+    |> Enum.scan(&(&1 + &2))
+  end
+
+  defp fft_convolve(signal, wavelet, scale) do
+    n = length(signal)
+    pad_length = next_power_of_2(n + length(wavelet) - 1)
+
+    # Pad signals to power of 2
+    padded_signal = pad_to_length(signal, pad_length)
+    padded_wavelet = pad_to_length(wavelet, pad_length)
+
+    # Convert to Nx tensors
+    signal_tensor = Nx.tensor(padded_signal, type: {:f, 64})
+    wavelet_tensor = Nx.tensor(padded_wavelet, type: {:f, 64})
+
+    # FFT both signals
+    signal_fft = Nx.fft(signal_tensor)
+    wavelet_fft = Nx.fft(wavelet_tensor)
+
+    # Multiply in frequency domain
+    convolved_fft = Nx.multiply(signal_fft, wavelet_fft)
+
+    # IFFT back to time domain
+    convolved =
+      Nx.ifft(convolved_fft)
+      |> Nx.to_list()
+      # Take only original signal length
+      |> Enum.take(n)
+
+    # Take derivative and scale
+    convolved
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [x1, x2] ->
+      dx = x2 - x1
+      factor = -:math.sqrt(scale)
+      # Real wavelet so imaginary part is 0
+      {dx * factor, 0.0}
+    end)
+  end
+
+  defp next_power_of_2(n) do
+    :math.pow(2, :math.ceil(:math.log2(n)))
+    |> round()
+  end
+
+  defp pad_to_length(list, length) do
+    padding = List.duplicate(0.0, length - Enum.count(list))
+    Enum.concat(list, padding)
   end
 
   defp integrate_wavelet(wavelet_fn) do
