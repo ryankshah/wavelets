@@ -33,7 +33,7 @@ defmodule Wavelets.CWT do
     points
     |> Enum.map(fn i ->
       x = i * dx / scale
-      # Morlet wavelet integral 
+      # Morlet wavelet integral
       term1 = :math.exp(-x * x / 2)
       term2 = :math.cos(5 * x)
       value = term1 * term2 * dx
