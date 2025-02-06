@@ -8,13 +8,8 @@ defmodule Wavelets.CWT do
   @doc """
   Performs 1D continuous wavelet transform
   """
-  @doc """
-  Performs continuous wavelet transform matching PyWavelets implementation
-  """
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
-
-    # Center the signal as in PyWavelets
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
@@ -34,11 +29,7 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Standard window size
     window_size = min(signal_length - 1, round(8 * scale))
-
-    # Additional factor of 2 for Morlet wavelet normalization
-    base_norm = 2.0 * :math.sqrt(dt / scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -51,17 +42,21 @@ defmodule Wavelets.CWT do
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
           t = (i - pos) * dt / scale
           {psi_re, psi_im} = wavelet_fn.(t)
+
+          # Scale wavelet by inverse square root of scale
+          psi_re = psi_re * :math.sqrt(1.0 / scale)
+          psi_im = psi_im * :math.sqrt(1.0 / scale)
+
           signal_val = Enum.at(signal, i)
 
-          # Integrate without scaling
           {
             re_acc + signal_val * psi_re,
             im_acc + signal_val * psi_im
           }
         end)
 
-      # Apply normalization once
-      {re * base_norm, im * base_norm}
+      # Final dt scaling only
+      {re * :math.sqrt(dt), im * :math.sqrt(dt)}
     end)
   end
 
