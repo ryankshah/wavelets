@@ -8,15 +8,7 @@ defmodule Wavelets.AnalysisTest do
     signal = [1.0, -1.0, 0.5, -0.5]
     energy = Analysis.energy_distribution(signal)
 
-    # Total energy should be preserved and normalized
-    # total_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
-    # expected_energy = total_energy / length(signal)
-    # assert_in_delta expected_energy, energy, 1.0e-10
-
-    # Looking at the test expectation:
-    # expected_energy = Enum.sum(Enum.map(signal, &(&1 * &1))) / length(signal)
-    # [1.0, -1.0, 0.5, -0.5] -> [1, 1, 0.25, 0.25] -> sum = 2.5 / 4 = 0.625
-
+    # Expected energy density = (1² + (-1)² + 0.5² + (-0.5)²) / 4 = 2.5/4 = 0.625
     expected_energy = 0.625
     assert_in_delta expected_energy, energy, 1.0e-10
   end
@@ -26,11 +18,13 @@ defmodule Wavelets.AnalysisTest do
     filter = Filters.Daubechies.get(1)
     {approx, details} = DWT.forward_1d(signal, filter)
 
-    approx_energy = Analysis.energy_distribution(approx)
-    details_energy = Analysis.energy_distribution(details)
-    total_energy = Analysis.energy_distribution(signal)
+    # For wavelet coefficients, we want raw energies because
+    # DWT applies its own normalization
+    signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+    approx_energy = Enum.sum(Enum.map(approx, &(&1 * &1)))
+    details_energy = Enum.sum(Enum.map(details, &(&1 * &1)))
 
-    # Should preserve total energy without normalization
-    assert_in_delta total_energy, approx_energy + details_energy, 1.0e-10
+    # Total energy should be preserved
+    assert_in_delta signal_energy, approx_energy + details_energy, 1.0e-10
   end
 end

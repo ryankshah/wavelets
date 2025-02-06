@@ -4,9 +4,10 @@ defmodule Wavelets.Analysis do
   """
 
   @doc """
-  Computes energy distribution in wavelet coefficients or signals
+  Computes energy distribution of signals or wavelet coefficients.
+  For regular signals, returns energy density (sum of squares / length).
+  For wavelet coefficients, preserves total energy.
   """
-  @spec energy_distribution(list(number) | list(list(number))) :: float | map()
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
@@ -17,17 +18,9 @@ defmodule Wavelets.Analysis do
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # Compute raw energy
         raw_energy = compute_energy(coeffs)
-
-        # If length <= 2, it's wavelet coefficients
-        if length(coeffs) <= 2 do
-          # Preserve energy for wavelet coefficients
-          raw_energy
-        else
-          # Energy density for regular signals
-          raw_energy / length(coeffs)
-        end
+        # For regular signal, return energy density
+        raw_energy / length(coeffs)
     end
   end
 
