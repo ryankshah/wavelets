@@ -20,22 +20,18 @@ defmodule Wavelets.CWT do
     |> Enum.map(fn scale ->
       IO.puts("\nProcessing scale: #{scale}")
 
-      # Get integrated wavelet
       {int_psi_re, int_psi_im} = integrate_wavelet(wavelet_fn, scale)
       IO.puts("Integrated wavelet: #{inspect({int_psi_re, int_psi_im})}")
 
-      # Convolve
       convolved = convolve_signal(centered_signal, {int_psi_re, int_psi_im})
 
       IO.puts(
         "First few convolution values: #{inspect(Enum.take(convolved, 3))}"
       )
 
-      # Take derivative and scale
       coeffs = derivative_and_scale(convolved, scale)
       IO.puts("First few coefficients: #{inspect(Enum.take(coeffs, 3))}")
 
-      # Check energy at this scale
       energy = compute_scale_energy(coeffs)
       IO.puts("Energy at scale #{scale}: #{energy}")
 
@@ -44,11 +40,9 @@ defmodule Wavelets.CWT do
   end
 
   defp integrate_wavelet(wavelet_fn, scale) do
-    # Integration points - use more points and smaller dx
     dx = 0.1 / scale
     points = -50..50
 
-    # Get wavelet values
     wavelet_points =
       points
       |> Enum.map(fn i ->
@@ -58,7 +52,6 @@ defmodule Wavelets.CWT do
         {psi_re, psi_im}
       end)
 
-    # Integrate with trapezoidal rule
     {int_re, int_im} =
       Enum.reduce(wavelet_points, {0.0, 0.0}, fn {psi_re, psi_im},
                                                  {acc_re, acc_im} ->
@@ -74,35 +67,54 @@ defmodule Wavelets.CWT do
 
   defp convolve_signal(signal, {int_psi_re, int_psi_im}) do
     signal_length = length(signal)
+    range = -signal_length..signal_length
 
-    # Do proper convolution
-    result =
-      -signal_length..signal_length
-      |> Enum.map(fn i ->
-        {sum_re, sum_im} =
-          Enum.reduce(0..(signal_length - 1), {0.0, 0.0}, fn j,
-                                                             {acc_re, acc_im} ->
-            signal_val =
-              if j >= 0 and j < signal_length, do: Enum.at(signal, j), else: 0.0
+    Enum.map(range, fn i ->
+      convolve_at_point(signal, i, int_psi_re, int_psi_im)
+    end)
+  end
 
-            shift = i + j
+  defp convolve_at_point(signal, shift, int_psi_re, int_psi_im) do
+    signal_length = length(signal)
 
-            # Only convolve when in range
-            if shift >= 0 and shift < signal_length do
-              {
-                acc_re + signal_val * int_psi_re,
-                acc_im + signal_val * int_psi_im
-              }
-            else
-              {acc_re, acc_im}
-            end
-          end)
-
-        {sum_re, sum_im}
+    {sum_re, sum_im} =
+      Enum.reduce(0..(signal_length - 1), {0.0, 0.0}, fn j, acc ->
+        accumulate_convolution(
+          signal,
+          j,
+          shift,
+          signal_length,
+          int_psi_re,
+          int_psi_im,
+          acc
+        )
       end)
 
-    IO.puts("Convolution length: #{length(result)}")
-    result
+    {sum_re, sum_im}
+  end
+
+  defp accumulate_convolution(
+         signal,
+         j,
+         shift,
+         signal_length,
+         int_psi_re,
+         int_psi_im,
+         {acc_re, acc_im}
+       ) do
+    signal_val =
+      if j >= 0 and j < signal_length, do: Enum.at(signal, j), else: 0.0
+
+    pos = shift + j
+
+    if pos >= 0 and pos < signal_length do
+      {
+        acc_re + signal_val * int_psi_re,
+        acc_im + signal_val * int_psi_im
+      }
+    else
+      {acc_re, acc_im}
+    end
   end
 
   defp derivative_and_scale(convolved, scale) do
