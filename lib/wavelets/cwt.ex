@@ -15,14 +15,11 @@ defmodule Wavelets.CWT do
 
     scales
     |> Enum.map(fn scale ->
-      # Use reciprocal scale to match PyWavelets
-      inv_scale = 1.0 / scale
-
       coeffs =
         transform_at_scale(
           centered_signal,
           wavelet_fn,
-          inv_scale,
+          scale,
           dt,
           signal_length
         )
@@ -32,8 +29,7 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    # Window size uses scale directly since we're passing inverse scale
-    window_size = min(signal_length - 1, round(8 / scale))
+    window_size = min(signal_length - 1, round(8 * scale))
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -54,19 +50,18 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      # Since we're using inverse scale, multiply by sqrt(scale)
-      norm = :math.sqrt(scale * dt)
-      {re * norm, im * norm}
+      # Simple normalization to match PyWavelets
+      {re * :math.sqrt(dt), im * :math.sqrt(dt)}
     end)
   end
 
   @doc """
   Computes energy at each scale including scale factor
   """
-  def compute_scale_energy(coeffs, scale) do
-    Enum.reduce(coeffs, 0.0, fn {re, im}, acc ->
-      acc + (re * re + im * im) * scale
-    end)
+  def compute_scale_energy(coeffs) do
+    coeffs
+    |> Enum.map(fn {re, im} -> re * re + im * im end)
+    |> Enum.sum()
   end
 
   @doc """

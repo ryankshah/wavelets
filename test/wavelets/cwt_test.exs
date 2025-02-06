@@ -9,7 +9,8 @@ defmodule Wavelets.CWTTest do
     scales = [1.0, 2.0, 4.0]
 
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0)
+      # Scale wavelet by 1/sqrt(scale) to preserve energy
+      norm = :math.exp(-x * x / 2)
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
     end
@@ -21,7 +22,7 @@ defmodule Wavelets.CWTTest do
     total_energy =
       result
       |> Enum.map(fn {scale, coeffs} ->
-        CWT.compute_scale_energy(coeffs, scale)
+        CWT.compute_scale_energy(coeffs)
       end)
       |> Enum.sum()
 
@@ -39,7 +40,8 @@ defmodule Wavelets.CWTTest do
     scales = [1.0, 2.0, 4.0]
 
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0)
+      # Keep wavelet scaling consistent with energy test
+      norm = :math.exp(-x * x / 2)
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
     end
@@ -48,19 +50,21 @@ defmodule Wavelets.CWTTest do
 
     [{scale1, coeffs1}, {scale2, coeffs2} | _] = result
 
+    # Scale the amplitudes by sqrt(scale) for admissibility
     max_amp1 =
       coeffs1
       |> Enum.map(&CWT.coefficient_magnitude/1)
+      |> Enum.map(&(&1 * :math.sqrt(scale1)))
       |> Enum.max()
 
     max_amp2 =
       coeffs2
       |> Enum.map(&CWT.coefficient_magnitude/1)
+      |> Enum.map(&(&1 * :math.sqrt(scale2)))
       |> Enum.max()
 
     theoretical_ratio = :math.sqrt(scale2 / scale1)
-    # Add scale compensation
-    actual_ratio = max_amp2 / max_amp1 * :math.sqrt(scale2 / scale1)
+    actual_ratio = max_amp2 / max_amp1
 
     assert_in_delta theoretical_ratio, actual_ratio, 0.05
   end
