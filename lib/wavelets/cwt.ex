@@ -16,34 +16,27 @@ defmodule Wavelets.CWT do
     # Get wavelet integral for normalization
     {wavelet_norm, _} = compute_wavelet_norm(wavelet_fn)
 
-    results =
-      scales
-      |> Enum.map(fn scale ->
-        coeffs =
-          transform_at_scale(
-            centered_signal,
-            wavelet_fn,
-            scale,
-            dt,
-            signal_length,
-            wavelet_norm
-          )
+    # Use inverse scales like PyWavelets
+    scales
+    |> Enum.map(fn scale ->
+      # Use inverse scale in transform
+      inv_scale = 1.0 / scale
 
-        {scale, coeffs}
-      end)
+      coeffs =
+        transform_at_scale(
+          centered_signal,
+          wavelet_fn,
+          inv_scale,
+          dt,
+          signal_length,
+          wavelet_norm
+        )
 
-    # Debug energies
-    total_energy =
-      results
-      # Remove scale multiplication
-      |> Enum.map(fn {scale, coeffs} -> compute_scale_energy(coeffs) end)
-      |> Enum.sum()
-
-    results
+      {scale, coeffs}
+    end)
   end
 
   defp compute_wavelet_norm(wavelet_fn) do
-    # Integrate wavelet numerically
     dx = 0.001
 
     points =
@@ -66,7 +59,8 @@ defmodule Wavelets.CWT do
          signal_length,
          wavelet_norm
        ) do
-    window_size = min(signal_length - 1, round(8 * scale))
+    # Note: scale here is already inverted (1/s)
+    window_size = min(signal_length - 1, round(8 / scale))
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -77,7 +71,8 @@ defmodule Wavelets.CWT do
       {conv_re, conv_im} =
         start_idx..end_idx
         |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
-          t = (i - pos) * dt / scale
+          # Using inverted scale
+          t = (i - pos) * dt * scale
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
@@ -87,9 +82,8 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      # Scale normalization
-      # Combined normalization
-      norm = 1.0 / :math.sqrt(scale * wavelet_norm)
+      # Use sqrt(scale) = sqrt(1/s) for normalization
+      norm = :math.sqrt(scale) / :math.sqrt(wavelet_norm)
       {conv_re * norm, conv_im * norm}
     end)
   end
