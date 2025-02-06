@@ -50,7 +50,7 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      norm = 1.0 / :math.sqrt(scale)
+      norm = :math.sqrt(dt / (scale * :math.sqrt(:math.pi())))
       {re * norm, im * norm}
     end)
   end

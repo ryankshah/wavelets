@@ -52,14 +52,12 @@ defmodule Wavelets.CWTTest do
     [{scale1, coeffs1}, {scale2, coeffs2} | _] = result
 
     max_amp1 =
-      coeffs1
-      |> Enum.map(fn {re, im} -> :math.sqrt(re * re + im * im) end)
-      |> Enum.max()
+      Enum.max_by(coeffs1, fn {re, im} -> :math.sqrt(re * re + im * im) end)
+      |> CWT.coefficient_magnitude()
 
     max_amp2 =
-      coeffs2
-      |> Enum.map(fn {re, im} -> :math.sqrt(re * re + im * im) end)
-      |> Enum.max()
+      Enum.max_by(coeffs2, fn {re, im} -> :math.sqrt(re * re + im * im) end)
+      |> CWT.coefficient_magnitude()
 
     theoretical_ratio = :math.sqrt(scale2 / scale1)
     actual_ratio = max_amp2 / max_amp1
