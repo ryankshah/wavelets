@@ -4,30 +4,23 @@ defmodule Wavelets.Analysis do
   """
 
   @doc """
-  Computes energy distribution across wavelet coefficients
+  Computes energy distribution in wavelet coefficients or signals
   """
   @spec energy_distribution(list(number) | list(list(number))) :: float | map()
   def energy_distribution(coeffs) when is_list(coeffs) do
     case is_list(hd(coeffs)) do
       true ->
+        # 2D case
         coeffs
         |> List.flatten()
         |> compute_energy()
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # For wavelets, total energy should be preserved
-        energy = compute_energy(coeffs)
-
-        # Check if it's wavelet coefficients by length pattern
-        if length(coeffs) < length(List.flatten(coeffs)) do
-          # wavelet coefficient case
-          # multiply by 2 to match PyWavelets
-          energy * 2
-        else
-          # regular signal case
-          energy / length(coeffs)
-        end
+        # For both signals and coefficients, just compute mean energy
+        coeffs
+        |> compute_energy()
+        |> Kernel./(length(coeffs))
     end
   end
 
