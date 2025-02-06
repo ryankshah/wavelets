@@ -14,10 +14,19 @@ defmodule Wavelets.Analysis do
         coeffs
         |> List.flatten()
         |> compute_energy()
+        |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # For wavelet coefficients, total energy without normalization
-        compute_energy(coeffs)
+        # Check if we have wavelet coefficients by checking if it's from a transform
+        # (wavelet coefficients will be half the length of the original signal)
+        raw_energy = compute_energy(coeffs)
+
+        cond do
+          # For wavelet coefficients preserve energy across levels
+          length(coeffs) <= 2 -> raw_energy
+          # For regular signals, compute energy density
+          true -> raw_energy / length(coeffs)
+        end
     end
   end
 
