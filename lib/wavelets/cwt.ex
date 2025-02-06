@@ -10,24 +10,21 @@ defmodule Wavelets.CWT do
   """
   def transform_1d(signal, wavelet_fn, scales, dt \\ 1.0, precision \\ :double) do
     signal_length = length(signal)
+    # Center signal
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
-    # Morlet normalization constant from PyWavelets
-    norm_const = :math.sqrt(2.0 / :math.pi())
-
+    # Compute transform at each scale
     scales
     |> Enum.map(fn scale ->
-      # Use integrated wavelet at this scale
+      # Follow PyWavelets' order: convolve, then take derivative
+      convolved =
+        convolve_signal(centered_signal, wavelet_fn, scale, dt, signal_length)
+
+      # Then differentiate and scale by sqrt(scale)
       coeffs =
-        transform_at_scale(
-          centered_signal,
-          wavelet_fn,
-          scale,
-          dt,
-          signal_length,
-          norm_const
-        )
+        convolved
+        |> diff_and_scale(scale)
 
       {scale, coeffs}
     end)
@@ -59,12 +56,33 @@ defmodule Wavelets.CWT do
     {int_re, int_im}
   end
 
-  defp convolve_signal(signal, {int_psi_re, int_psi_im}) do
-    signal_length = length(signal)
-    range = -signal_length..signal_length
+  defp convolve_signal(signal, wavelet_fn, scale, dt, signal_length) do
+    # PyWavelets window size
+    window_size = min(signal_length - 1, round(8 * scale))
 
-    Enum.map(range, fn i ->
-      convolve_at_point(signal, i, int_psi_re, int_psi_im)
+    0..(signal_length - 1)
+    |> Enum.map(fn pos ->
+      half_window = div(window_size, 2)
+      start_idx = max(0, pos - half_window)
+      end_idx = min(signal_length - 1, pos + half_window)
+
+      {re, im} =
+        start_idx..end_idx
+        |> Enum.reduce({0.0, 0.0}, fn i, {re_acc, im_acc} ->
+          t = (i - pos) * dt / scale
+          {psi_re, psi_im} = wavelet_fn.(t)
+          signal_val = Enum.at(signal, i)
+
+          # Scale by sqrt(dt/scale) during convolution
+          norm = :math.sqrt(dt / scale)
+
+          {
+            re_acc + signal_val * psi_re * norm,
+            im_acc + signal_val * psi_im * norm
+          }
+        end)
+
+      {re, im}
     end)
   end
 
@@ -124,6 +142,19 @@ defmodule Wavelets.CWT do
 
     IO.puts("Derivative length: #{length(result)}")
     result
+  end
+
+  defp diff_and_scale(convolved, scale) do
+    # Take derivative and multiply by -sqrt(scale)
+    convolved
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [{re1, im1}, {re2, im2}] ->
+      d_re = re2 - re1
+      d_im = im2 - im1
+      # Multiply by -sqrt(scale) like PyWavelets
+      scale_factor = -:math.sqrt(scale)
+      {d_re * scale_factor, d_im * scale_factor}
+    end)
   end
 
   defp transform_at_scale(
