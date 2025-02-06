@@ -14,13 +14,10 @@ defmodule Wavelets.Analysis do
         coeffs
         |> List.flatten()
         |> compute_energy()
-        |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # For both signals and coefficients, just compute mean energy
-        coeffs
-        |> compute_energy()
-        |> Kernel./(length(coeffs))
+        # For wavelet coefficients, total energy without normalization
+        compute_energy(coeffs)
     end
   end
 

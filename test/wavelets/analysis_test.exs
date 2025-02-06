@@ -30,7 +30,7 @@ defmodule Wavelets.AnalysisTest do
     details_energy = Analysis.energy_distribution(details)
     total_energy = Analysis.energy_distribution(signal)
 
-    # Total signal energy should equal sum of transform energies
+    # Should preserve total energy without normalization
     assert_in_delta total_energy, approx_energy + details_energy, 1.0e-10
   end
 end

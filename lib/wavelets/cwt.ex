@@ -29,6 +29,7 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
+    # PyWavelets window size 
     width = 8 * scale
     window_size = min(signal_length - 1, round(width))
 
@@ -45,16 +46,14 @@ defmodule Wavelets.CWT do
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
-          # PyWavelets scales the wavelet, not the signal
-          psi_re = psi_re / :math.sqrt(scale)
-          psi_im = psi_im / :math.sqrt(scale)
-
+          # Scale the wavelet, not the signal
           {
-            re_acc + signal_val * psi_re,
-            im_acc + signal_val * psi_im
+            re_acc + signal_val * psi_re / :math.sqrt(scale),
+            im_acc + signal_val * psi_im / :math.sqrt(scale)
           }
         end)
 
+      # Final scaling
       {re * :math.sqrt(dt), im * :math.sqrt(dt)}
     end)
   end
