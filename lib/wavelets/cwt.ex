@@ -45,11 +45,11 @@ defmodule Wavelets.CWT do
          signal_length,
          _energy_factor
        ) do
-    # PyWavelets uses a wider window than we thought
-    window_size = min(signal_length - 1, round(16 * scale))
+    # Use same window size calculation as PyWavelets
+    window_size = min(signal_length - 1, round(10 * scale))
 
-    # Scales are reversed in PyWavelets compared to our expectations
-    norm = :math.sqrt(scale)
+    # Morlet wavelet normalization in PyWavelets uses this factor
+    norm = dt * :math.sqrt(scale)
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -64,6 +64,7 @@ defmodule Wavelets.CWT do
           {psi_re, psi_im} = wavelet_fn.(t)
           signal_val = Enum.at(signal, i)
 
+          # Scale both wavelet and signal correctly
           {
             re_acc + signal_val * psi_re / norm,
             im_acc + signal_val * psi_im / norm
