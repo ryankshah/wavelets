@@ -64,7 +64,6 @@ defmodule Wavelets.CWTTest do
     theoretical_ratio = :math.sqrt(scale2 / scale1)
     actual_ratio = max_amp2 / max_amp1
 
-    # Tighter tolerance
     assert_in_delta theoretical_ratio, actual_ratio, 0.05
   end
 end
