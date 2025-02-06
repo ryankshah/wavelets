@@ -40,7 +40,7 @@ defmodule Wavelets.CWT do
     points = -100..100
     x_values = Enum.map(points, fn i -> i * dx end)
 
-    # Get wavelet values 
+    # Get wavelet values
     wavelet_values =
       Enum.map(x_values, fn x ->
         {psi_re, psi_im} = wavelet_fn.(x)
