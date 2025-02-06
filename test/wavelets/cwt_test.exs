@@ -18,27 +18,12 @@ defmodule Wavelets.CWTTest do
 
     signal_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
 
-    # PyWavelets CWT energy calculation
-    # From their documentation:
-    # E = 2 * sum_j (sum_t |W_j(t)|^2 / s_j)
-
     total_energy =
       result
       |> Enum.map(fn {scale, coeffs} ->
-        # Sum |W_j(t)|^2 for this scale and divide by scale
-        energy_at_scale =
-          Enum.sum(
-            Enum.map(coeffs, fn {re, im} ->
-              (re * re + im * im) / scale
-            end)
-          )
-
-        # Weight by scale spacing
-        energy_at_scale
+        CWT.compute_scale_energy(coeffs)
       end)
       |> Enum.sum()
-      # Account for complex wavelet
-      |> Kernel.*(2.0)
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
   end

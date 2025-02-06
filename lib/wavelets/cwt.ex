@@ -13,6 +13,9 @@ defmodule Wavelets.CWT do
     signal_mean = Enum.sum(signal) / signal_length
     centered_signal = Enum.map(signal, &(&1 - signal_mean))
 
+    # Calculate frequency normalization
+    freq_norm = :math.sqrt(:math.pi() * :math.pi() / 2)
+
     scales
     |> Enum.map(fn scale ->
       coeffs =
@@ -21,14 +24,22 @@ defmodule Wavelets.CWT do
           wavelet_fn,
           scale,
           dt,
-          signal_length
+          signal_length,
+          freq_norm
         )
 
       {scale, coeffs}
     end)
   end
 
-  defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
+  defp transform_at_scale(
+         signal,
+         wavelet_fn,
+         scale,
+         dt,
+         signal_length,
+         freq_norm
+       ) do
     window_size = min(signal_length - 1, round(8 * scale))
 
     0..(signal_length - 1)
@@ -50,8 +61,8 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      # Simple normalization to match PyWavelets
-      {re * :math.sqrt(dt), im * :math.sqrt(dt)}
+      # Include frequency normalization
+      {re * freq_norm / :math.sqrt(scale), im * freq_norm / :math.sqrt(scale)}
     end)
   end
 
