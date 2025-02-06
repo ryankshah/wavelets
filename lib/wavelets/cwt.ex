@@ -1,6 +1,6 @@
 defmodule Wavelets.CWT do
   @moduledoc """
-  Implementation of the Continuous Wavelet Transform with proper normalization
+  Implementation of the Continuous Wavelet Transform
   """
 
   alias Wavelets.Utils.Complex
@@ -15,11 +15,14 @@ defmodule Wavelets.CWT do
 
     scales
     |> Enum.map(fn scale ->
+      # Use reciprocal scale to match PyWavelets
+      inv_scale = 1.0 / scale
+
       coeffs =
         transform_at_scale(
           centered_signal,
           wavelet_fn,
-          scale,
+          inv_scale,
           dt,
           signal_length
         )
@@ -29,7 +32,8 @@ defmodule Wavelets.CWT do
   end
 
   defp transform_at_scale(signal, wavelet_fn, scale, dt, signal_length) do
-    window_size = min(signal_length - 1, round(8 * scale))
+    # Window size uses scale directly since we're passing inverse scale
+    window_size = min(signal_length - 1, round(8 / scale))
 
     0..(signal_length - 1)
     |> Enum.map(fn pos ->
@@ -50,16 +54,19 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      norm = 1.0 / :math.sqrt(scale)
+      # Since we're using inverse scale, multiply by sqrt(scale)
+      norm = :math.sqrt(scale * dt)
       {re * norm, im * norm}
     end)
   end
 
   @doc """
-  Computes energy at each scale
+  Computes energy at each scale including scale factor
   """
-  def compute_scale_energy(coeffs) do
-    Enum.reduce(coeffs, 0.0, fn {re, im}, acc -> acc + (re * re + im * im) end)
+  def compute_scale_energy(coeffs, scale) do
+    Enum.reduce(coeffs, 0.0, fn {re, im}, acc ->
+      acc + (re * re + im * im) * scale
+    end)
   end
 
   @doc """

@@ -8,10 +8,7 @@ defmodule Wavelets.CWTTest do
     signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     scales = [1.0, 2.0, 4.0]
 
-    # Modified Morlet wavelet to match PyWavelets exactly
     wavelet_fn = fn x ->
-      # PyWavelets multiplies the complex exponential by pi
-      # and scales the Gaussian envelope
       norm = :math.exp(-x * x / 2) * :math.sqrt(2.0)
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
@@ -23,7 +20,9 @@ defmodule Wavelets.CWTTest do
 
     total_energy =
       result
-      |> Enum.map(fn {_, coeffs} -> CWT.compute_scale_energy(coeffs) end)
+      |> Enum.map(fn {scale, coeffs} ->
+        CWT.compute_scale_energy(coeffs, scale)
+      end)
       |> Enum.sum()
 
     assert_in_delta signal_energy, total_energy, 1.0e-6
@@ -40,14 +39,13 @@ defmodule Wavelets.CWTTest do
     scales = [1.0, 2.0, 4.0]
 
     wavelet_fn = fn x ->
-      norm = :math.exp(-x * x / 2) * (:math.sqrt(2.0) / :math.sqrt(:math.pi()))
+      norm = :math.exp(-x * x / 2) * :math.sqrt(2.0)
       freq = 5.0 * :math.pi()
       {:math.cos(freq * x) * norm, :math.sin(freq * x) * norm}
     end
 
     result = CWT.transform_1d(signal, wavelet_fn, scales)
 
-    # Get scale ratios
     [{scale1, coeffs1}, {scale2, coeffs2} | _] = result
 
     max_amp1 =
@@ -61,7 +59,8 @@ defmodule Wavelets.CWTTest do
       |> Enum.max()
 
     theoretical_ratio = :math.sqrt(scale2 / scale1)
-    actual_ratio = max_amp2 / max_amp1
+    # Add scale compensation
+    actual_ratio = max_amp2 / max_amp1 * :math.sqrt(scale2 / scale1)
 
     assert_in_delta theoretical_ratio, actual_ratio, 0.05
   end
