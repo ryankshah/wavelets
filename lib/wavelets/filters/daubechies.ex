@@ -1,62 +1,56 @@
 defmodule Wavelets.Filters.Daubechies do
   @moduledoc """
-  Implementation of Daubechies wavelet filters.
+  Filter implementation with consistent scaling
   """
 
   alias Wavelets.Filter
 
-  @doc """
-  Returns coefficients for the Daubechies wavelet family
-  """
   def get(vanishing_moments) when vanishing_moments > 0 do
     case vanishing_moments do
       1 ->
-        # Daubechies 2 (same as Haar)
+        # Haar wavelet with consistent 0.5 scaling
         %Filter{
           name: "db1",
           family: :daubechies,
           vanishing_moments: 1,
-          decomposition_low_pass: [0.7071067811865476, 0.7071067811865476],
-          decomposition_high_pass: [-0.7071067811865476, 0.7071067811865476],
-          reconstruction_low_pass: [0.7071067811865476, 0.7071067811865476],
-          reconstruction_high_pass: [0.7071067811865476, -0.7071067811865476],
+          # Half sum
+          decomposition_low_pass: [0.5, 0.5],
+          # Half difference
+          decomposition_high_pass: [0.5, -0.5],
+          # Same for reconstruction
+          reconstruction_low_pass: [0.5, 0.5],
+          reconstruction_high_pass: [0.5, -0.5],
           support_width: 2
         }
 
       2 ->
-        # Daubechies 4
+        # Normalized Daubechies-4
+        h = [
+          1 + :math.sqrt(3),
+          3 + :math.sqrt(3),
+          3 - :math.sqrt(3),
+          1 - :math.sqrt(3)
+        ]
+
+        # Basic normalization
+        norm = 8.0
+
+        coeffs = Enum.map(h, &(&1 / norm))
+
         %Filter{
           name: "db2",
           family: :daubechies,
           vanishing_moments: 2,
-          decomposition_low_pass: [
-            0.4829629131445341,
-            0.8365163037378079,
-            0.2241438680420134,
-            -0.1294095225512604
-          ],
-          decomposition_high_pass: [
-            -0.1294095225512604,
-            -0.2241438680420134,
-            0.8365163037378079,
-            -0.4829629131445341
-          ],
-          reconstruction_low_pass: [
-            0.4829629131445341,
-            0.8365163037378079,
-            0.2241438680420134,
-            -0.1294095225512604
-          ],
-          reconstruction_high_pass: [
-            -0.1294095225512604,
-            0.2241438680420134,
-            0.8365163037378079,
-            0.4829629131445341
-          ],
+          decomposition_low_pass: coeffs,
+          decomposition_high_pass:
+            Enum.zip(coeffs |> Enum.reverse(), [1, -1, 1, -1])
+            |> Enum.map(fn {c, s} -> c * s end),
+          reconstruction_low_pass: coeffs,
+          reconstruction_high_pass:
+            Enum.zip(coeffs |> Enum.reverse(), [1, -1, 1, -1])
+            |> Enum.map(fn {c, s} -> c * s end),
           support_width: 4
         }
-
-        # Add more vanishing moments as needed
     end
   end
 end

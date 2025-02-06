@@ -3,54 +3,67 @@ defmodule Wavelets.WaveletPacketTest do
   doctest Wavelets.WaveletPacket
 
   import Wavelets.TestHelpers
-  alias Wavelets.{WaveletPacket, Filters}
+  alias Wavelets.{Filters, WaveletPacket}
 
-  describe "decompose_1d/4" do
-    test "creates correct tree structure" do
-      signal = generate_test_signal()
-      filter = Filters.Daubechies.get(1)
-      levels = 2
+  test "creates correct tree structure" do
+    signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    filter = Filters.Daubechies.get(1)
+    levels = 2
 
-      tree = WaveletPacket.decompose_1d(signal, filter, levels)
+    tree = WaveletPacket.decompose_1d(signal, filter, levels)
 
-      # Check tree structure
-      # Root node
-      assert Map.has_key?(tree, {0, 0})
-      # Level 1 nodes
-      assert Map.has_key?(tree, {1, 0})
-      assert Map.has_key?(tree, {1, 1})
-      # Level 2 nodes
-      assert Map.has_key?(tree, {2, 0})
-      assert Map.has_key?(tree, {2, 1})
-      assert Map.has_key?(tree, {2, 2})
-      assert Map.has_key?(tree, {2, 3})
-    end
+    # Check tree structure
+    assert Map.has_key?(tree, {0, 0})
+    assert Map.has_key?(tree, {1, 0})
+    assert Map.has_key?(tree, {1, 1})
+    assert Map.has_key?(tree, {2, 0})
+    assert Map.has_key?(tree, {2, 1})
+    assert Map.has_key?(tree, {2, 2})
+    assert Map.has_key?(tree, {2, 3})
 
-    test "perfectly reconstructs signal" do
-      signal = generate_test_signal()
-      filter = Filters.Daubechies.get(2)
-      levels = 3
+    # Root node should contain original signal
+    assert Map.get(tree, {0, 0}) == signal
+  end
 
-      tree = WaveletPacket.decompose_1d(signal, filter, levels)
+  test "perfectly reconstructs signal" do
+    signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    filter = Filters.Daubechies.get(2)
+    levels = 3
+
+    tree = WaveletPacket.decompose_1d(signal, filter, levels)
+    reconstructed = WaveletPacket.reconstruct_1d(tree, filter)
+
+    assert_close(signal, reconstructed, 1.0e-8)
+  end
+
+  test "handles different wavelet filters" do
+    signal = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    original_energy = Enum.sum(Enum.map(signal, &(&1 * &1)))
+
+    filters = [
+      Filters.Daubechies.get(1),
+      Filters.Daubechies.get(2),
+      Filters.Symlet.get(4)
+    ]
+
+    Enum.each(filters, fn filter ->
+      tree = WaveletPacket.decompose_1d(signal, filter, 2)
       reconstructed = WaveletPacket.reconstruct_1d(tree, filter)
+      assert_close(signal, reconstructed, 1.0e-8)
 
-      assert_close(signal, reconstructed)
-    end
+      # Check energy conservation at each level
+      Enum.each(0..2, fn level ->
+        level_coeffs =
+          for j <- 0..(trunc(:math.pow(2, level)) - 1),
+              coeffs = Map.get(tree, {level, j}),
+              coeffs != nil,
+              do: coeffs |> List.flatten()
 
-    test "handles different wavelet filters" do
-      signal = generate_test_signal()
+        level_energy =
+          level_coeffs |> List.flatten() |> Enum.map(&(&1 * &1)) |> Enum.sum()
 
-      filters = [
-        Filters.Daubechies.get(1),
-        Filters.Symlet.get(4),
-        Filters.Coiflets.get(1)
-      ]
-
-      Enum.each(filters, fn filter ->
-        tree = WaveletPacket.decompose_1d(signal, filter, 2)
-        reconstructed = WaveletPacket.reconstruct_1d(tree, filter)
-        assert_close(signal, reconstructed)
+        assert_in_delta original_energy, level_energy, 1.0e-8
       end)
-    end
+    end)
   end
 end

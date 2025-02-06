@@ -1,20 +1,23 @@
 defmodule Wavelets.Filters.Morlet do
   @moduledoc """
-  Implementation of Morlet wavelet filters.
+  Implementation of Morlet wavelet filters with proper normalization
   """
 
   alias Wavelets.Filter
 
   def get(sigma \\ 5.0) do
+    h0 = 1 / :math.sqrt(2)
+    coeffs = generate_coeffs(sigma)
+    normalized_coeffs = Enum.map(coeffs, &(&1 * h0))
+
     %Filter{
       name: "morl",
       family: :morlet,
-      # Not applicable for Morlet
       vanishing_moments: nil,
-      decomposition_low_pass: generate_coeffs(sigma),
-      decomposition_high_pass: generate_coeffs(sigma),
-      reconstruction_low_pass: generate_coeffs(sigma),
-      reconstruction_high_pass: generate_coeffs(sigma),
+      decomposition_low_pass: normalized_coeffs,
+      decomposition_high_pass: normalized_coeffs,
+      reconstruction_low_pass: normalized_coeffs,
+      reconstruction_high_pass: normalized_coeffs,
       support_width: trunc(8 * sigma)
     }
   end

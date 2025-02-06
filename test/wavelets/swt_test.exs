@@ -3,7 +3,8 @@ defmodule Wavelets.SWTTest do
   doctest Wavelets.SWT
 
   import Wavelets.TestHelpers
-  alias Wavelets.{SWT, Filters}
+  alias Wavelets.Filters
+  alias Wavelets.SWT
 
   describe "transform_1d/4" do
     test "computes correct number of levels" do
@@ -51,5 +52,10 @@ defmodule Wavelets.SWTTest do
         assert length(details) == 2
       end)
     end
+  end
+
+  # Helper function for generating test signals
+  defp generate_test_signal do
+    [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
   end
 end
