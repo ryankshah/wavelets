@@ -17,15 +17,16 @@ defmodule Wavelets.Analysis do
         |> Kernel./(length(List.flatten(coeffs)))
 
       false ->
-        # Check if we have wavelet coefficients by checking if it's from a transform
-        # (wavelet coefficients will be half the length of the original signal)
+        # Compute raw energy
         raw_energy = compute_energy(coeffs)
 
-        cond do
-          # For wavelet coefficients preserve energy across levels
-          length(coeffs) <= 2 -> raw_energy
-          # For regular signals, compute energy density
-          true -> raw_energy / length(coeffs)
+        # If length <= 2, it's wavelet coefficients
+        if length(coeffs) <= 2 do
+          # Preserve energy for wavelet coefficients
+          raw_energy
+        else
+          # Energy density for regular signals
+          raw_energy / length(coeffs)
         end
     end
   end
