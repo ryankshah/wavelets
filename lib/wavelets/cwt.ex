@@ -50,7 +50,7 @@ defmodule Wavelets.CWT do
           }
         end)
 
-      norm = 1.0 / :math.sqrt(scale)
+      norm = 1.0 / :math.sqrt(scale * dt)
       {re * norm, im * norm}
     end)
   end
@@ -59,7 +59,8 @@ defmodule Wavelets.CWT do
   Computes energy at each scale
   """
   def compute_scale_energy(coeffs) do
-    Enum.reduce(coeffs, 0.0, fn {re, im}, acc -> acc + (re * re + im * im) end)
+    coeffs
+    |> Enum.reduce(0.0, fn {re, im}, acc -> acc + (re * re + im * im) end)
   end
 
   @doc """
